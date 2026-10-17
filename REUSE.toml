@@ -86,24 +86,6 @@ path = [
 SPDX-FileCopyrightText = "The Eigen Authors"
 SPDX-License-Identifier = "MPL-2.0"
 
-# Graphify index. Generated tool output, not authored prose, so it cannot
-# carry inline SPDX tags; listed here so REUSE sees it as covered rather than
-# as a licence violation. The AST cache, dated snapshots and graph.html are
-# gitignored and are not covered.
-[[annotations]]
-path = [
-    "graphify-out/graph.json",
-    "graphify-out/manifest.json",
-    "graphify-out/GRAPH_REPORT.md",
-    "graphify-out/.graphify_labels.json",
-    "graphify-out/.graphify_labels.json.sig",
-    "graphify-out/.graphify_labels.pending.json",
-    "graphify-out/.graphify_semantic_marker",
-    "graphify-out/.graphify_root",
-]
-SPDX-FileCopyrightText = "The Eigen Authors"
-SPDX-License-Identifier = "MPL-2.0"
-
 # Local agent guidance and scratch planning docs for the WebAssembly build.
 # Documentation, so inline SPDX tags would be noise.
 [[annotations]]
