@@ -12,12 +12,19 @@ set -euo pipefail
 # C++17 is required by Emscripten, not by Eigen (Eigen itself is C++14, CMakeLists.txt:220).
 
 # Requires an activated emsdk; it bundles its own Python and Node.
-#   source /tmp/emsdk/emsdk_env.sh
+#   source /path/to/emsdk/emsdk_env.sh
+# CI does not use that path: .github/workflows/wasm.yml runs emscripten/emsdk
+# from the emsdk Docker image, where em++ is already on PATH.
+#
+# em++ not emcc: emcc links no C++ runtime. The 3x3 product touches no
+# libstdc++ symbol and slips through, but any Eigen decomposition (LU, QR,
+# SVD, ...) needs __cxa_allocate_exception and std::bad_alloc, and fails to
+# link with "undefined symbol". em++ links libstdc++ automatically.
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)   # Eigen/ lives at the repository root
 
-EMCC=${EMCC:-emcc}
+EMCC=${EMCC:-em++}
 SRC=${SRC:-$HERE/eigen_wasm.cpp}
 OUT=${OUT:-$HERE/eigen_wasm.js}
 

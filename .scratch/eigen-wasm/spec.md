@@ -18,12 +18,31 @@ Objective: Reproduce an Eigen build in WebAssembly with Core+Dense.
 | `-s EXPORTED_FUNCTIONS` | `_matMul3x3`, `_malloc`, `_free` | callers allocate their own buffers |
 | `-s EXPORTED_RUNTIME_METHODS` | `ccall`, `cwrap`, `setValue`, `getValue` | JS-side memory access |
 
+## Build script contract
+
+`build.sh` honours `EMCC`, `SRC` and `OUT` from the environment. Unset, it compiles
+`eigen_wasm.cpp` to `eigen_wasm.js` beside itself. It must invoke `em++`, not `emcc`:
+`emcc` links no C++ runtime, so the 3x3 product compiles but any Eigen decomposition
+fails to link on `__cxa_allocate_exception`.
+
 ## Deliverables
 
 - `wasm/eigen_wasm.cpp` exposing `matMul3x3(const double* a, const double* b, double* out)`, computing `out = a * b` for row-major 3x3 matrices.
 - `wasm/build.sh` producing `wasm/eigen_wasm.js` and `wasm/eigen_wasm.wasm`, both gitignored.
-- `wasm/test_matmul.js`, a Node test validating `matMul3x3` and exiting non-zero on mismatch.
+- `wasm/test_matmul.js`, a Node test validating `matMul3x3` and exiting non-zero if any case fails.
 - `wasm/README.md` documenting the build, the test, and the calling contract.
+- `.github/workflows/wasm.yml` running the build and the test on GitHub Actions, on any change under `wasm/` or `Eigen/`.
+
+## Test coverage
+
+`test_matmul.js` covers the product against hand-computed literals, and the
+documented aliasing contract (`out` may be `a` or `b`) with two further cases. The
+aliasing guarantee depends on Eigen evaluating the product into a temporary before
+storing into `out`, which is an evaluator implementation detail, so it is pinned by
+a test rather than left as a comment.
+
+Not covered: browser execution, null or out-of-range pointers, and any scalar other
+than `double`.
 
 ## Decisions taken during implementation
 
