@@ -10,6 +10,7 @@ import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
 const determinant = Module.cwrap('determinant', 'number', ['number', 'number', 'number', 'number']);
+const maxDimension = Module.cwrap('maxDimension', 'number', []);
 
 // Eigen::ComputationInfo, as returned over the ABI. No mapping: these are the enum's own
 // values. determinant() can report SUCCESS or INVALID_INPUT only; the other two values
@@ -23,8 +24,9 @@ const PRECISION = 1e-6;
 // A determinant that is not a result: survives a failed call if nothing was written.
 const SENTINEL = -1.2345678901234e-100;
 
-// The dimension ceiling eigen_wasm.cpp guards, so the boundary is tested rather than assumed.
-const MAX_DIMENSION = 255;
+// Read the dimension ceiling directly from the module so the test and implementation
+// cannot drift out of sync.
+const MAX_DIMENSION = maxDimension();
 
 let failed = 0;
 
@@ -63,14 +65,22 @@ function alloc(values) {
 
 // A successful call, named after what it checks.
 function check(name, values, rows, cols, expected) {
-  const aPtr = alloc(values);
-  const outPtr = Module._malloc(8);
-  const info = determinant(aPtr, rows, cols, outPtr);
-  const det = Module.getValue(outPtr, 'double');
-  Module._free(aPtr);
-  Module._free(outPtr);
-  report(`${name}: ComputationInfo`, info, SUCCESS);
-  reportClose(name, det, expected);
+  let aPtr = 0;
+  let outPtr = 0;
+  try {
+    aPtr = alloc(values);
+    outPtr = Module._malloc(8);
+    const info = determinant(aPtr, rows, cols, outPtr);
+    const det = Module.getValue(outPtr, 'double');
+    report(`${name}: ComputationInfo`, info, SUCCESS);
+    reportClose(name, det, expected);
+  } catch (err) {
+    failed++;
+    console.error(`not ok - ${name} threw an unexpected error: ${err.message}`);
+  } finally {
+    if (aPtr !== 0) Module._free(aPtr);
+    if (outPtr !== 0) Module._free(outPtr);
+  }
 }
 
 check('1x1', [6], 1, 1, 6);
@@ -93,15 +103,23 @@ check(`${MAX_DIMENSION}x${MAX_DIMENSION} unit upper triangular`, unitUpper, MAX_
 // A singular matrix is a determinant, not a failure: its answer is 0 and it still reports
 // Success. Only the code is asserted, because no finite determinant equals a computed 0.
 {
-  const aPtr = alloc([1, 2, 2, 4]);
-  const outPtr = Module._malloc(8);
-  Module.setValue(outPtr, SENTINEL, 'double');
-  const info = determinant(aPtr, 2, 2, outPtr);
-  const det = Module.getValue(outPtr, 'double');
-  Module._free(aPtr);
-  Module._free(outPtr);
-  report('singular 2x2 reports Success', info, SUCCESS);
-  report('singular 2x2 determinant is zero', Math.abs(det) <= PRECISION * 4, true);
+  let aPtr = 0;
+  let outPtr = 0;
+  try {
+    aPtr = alloc([1, 2, 2, 4]);
+    outPtr = Module._malloc(8);
+    Module.setValue(outPtr, SENTINEL, 'double');
+    const info = determinant(aPtr, 2, 2, outPtr);
+    const det = Module.getValue(outPtr, 'double');
+    report('singular 2x2 reports Success', info, SUCCESS);
+    report('singular 2x2 determinant is zero', Math.abs(det) <= PRECISION * 4, true);
+  } catch (err) {
+    failed++;
+    console.error(`not ok - singular 2x2 threw an error: ${err.message}`);
+  } finally {
+    if (aPtr !== 0) Module._free(aPtr);
+    if (outPtr !== 0) Module._free(outPtr);
+  }
 }
 
 // The contract seam: every rejected input reports InvalidInput and leaves the caller's
@@ -122,21 +140,26 @@ const rejected = [
 ];
 
 for (const [name, values, rows, cols, out] of rejected) {
+  const hasOut = out !== null;
   const aPtr = values === null ? 0 : alloc(values);
-  const outPtr = out === null ? 0 : Module._malloc(8);
-  if (outPtr !== 0) Module.setValue(outPtr, SENTINEL, 'double');
+  const outPtr = hasOut ? Module._malloc(8) : 0;
+  if (hasOut) Module.setValue(outPtr, SENTINEL, 'double');
 
-  const info = determinant(aPtr, rows, cols, outPtr);
+  try {
+    const info = determinant(aPtr, rows, cols, outPtr);
+    report(`${name}: InvalidInput`, info, INVALID_INPUT);
 
-  let untouched = null;
-  if (outPtr !== 0) {
-    untouched = Module.getValue(outPtr, 'double') === SENTINEL;
-    Module._free(outPtr);
+    if (hasOut) {
+      const untouched = Module.getValue(outPtr, 'double') === SENTINEL;
+      report(`${name}: output untouched`, untouched, true);
+    }
+  } catch (err) {
+    failed++;
+    console.error(`not ok - ${name} threw an unexpected error: ${err.message}`);
+  } finally {
+    if (outPtr !== 0) Module._free(outPtr);
+    if (aPtr !== 0) Module._free(aPtr);
   }
-  if (aPtr !== 0) Module._free(aPtr);
-
-  report(`${name}: InvalidInput`, info, INVALID_INPUT);
-  if (outPtr !== 0) report(`${name}: output untouched`, untouched, true);
 }
 
 process.exit(failed ? 1 : 0);
