@@ -55,6 +55,9 @@ import EigenWasmModule from './wasm/eigen_wasm.js';
 const Module = await EigenWasmModule();
 const matMul3x3 = Module.cwrap('matMul3x3', null, ['number', 'number', 'number']);
 
+const a = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+const b = [9, 8, 7, 6, 5, 4, 3, 2, 1];
+
 const aPtr = Module._malloc(72);
 const bPtr = Module._malloc(72);
 const outPtr = Module._malloc(72);
@@ -67,11 +70,20 @@ matMul3x3(aPtr, bPtr, outPtr);
 
 const result = [];
 for (let i = 0; i < 9; i++) result.push(Module.getValue(outPtr + i * 8, 'double'));
+
+Module._free(aPtr);
+Module._free(bPtr);
+Module._free(outPtr);
+
+console.log(result);   // [30,24,18,84,69,54,138,114,90]
 ```
 
 Use `setValue` and `getValue` rather than a `Module.HEAPF64` view. The build sets
 `ALLOW_MEMORY_GROWTH`, which detaches typed-array views when the heap grows, so a
 retained view silently reads stale memory.
+
+Free every buffer once you are done with it. Because the heap may grow, leaking is
+not bounded by anything: a call per frame without `_free` ends in a killed tab.
 
 ## Files
 
