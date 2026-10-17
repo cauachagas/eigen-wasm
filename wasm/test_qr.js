@@ -60,6 +60,7 @@ function testQR(name, A_vals, rows, cols) {
     aPtr = alloc(A_vals);
     qPtr = Module._malloc(rows * rows * 8);
     rPtr = Module._malloc(rows * cols * 8);
+    for (let i = 0; i < rows * cols; i++) Module.setValue(rPtr + i * 8, SENTINEL, 'double');
 
     const info = qr(aPtr, rows, cols, qPtr, rPtr);
     report(`${name}: info`, info, SUCCESS);
@@ -105,6 +106,18 @@ function testQR(name, A_vals, rows, cols) {
     const passRecon = reconNorm <= Math.max(aNorm, 1.0) * PRECISION;
     if (!passRecon) failed++;
     report(`${name}: reconstruction ||Q R - A|| = ${reconNorm.toExponential(3)}`, passRecon, true);
+
+    // 3. R is strictly upper-triangular: entries with i > j must be exactly 0.0
+    let lowerZero = true;
+    for (let i = 0; i < rows; i++) {
+      for (let j = 0; j < cols; j++) {
+        if (i > j && R[i * cols + j] !== 0) {
+          lowerZero = false;
+        }
+      }
+    }
+    if (!lowerZero) failed++;
+    report(`${name}: R strictly upper triangular (zeros below diagonal)`, lowerZero, true);
   } catch (err) {
     failed++;
     console.error(`not ok - ${name} threw error: ${err.message}`);
@@ -245,5 +258,34 @@ for (const [name, A_vals, rows, cols] of rejected) {
   }
 }
 
+// Test non-finite input rejection and untouched buffers for qr and solveLeastSquares
+{
+  const nanMat = [NaN, 1, 2, 3];
+  const aPtr = alloc(nanMat);
+  const bPtr = alloc([1, 2]);
+  const xPtr = Module._malloc(2 * 8);
+  Module.setValue(xPtr, SENTINEL, 'double');
+  Module.setValue(xPtr + 8, SENTINEL, 'double');
+
+  const lsInfo = solveLeastSquares(aPtr, bPtr, 2, 2, xPtr);
+  report('LS NaN in A returns InvalidInput', lsInfo, INVALID_INPUT);
+  report('LS NaN in A leaves output untouched',
+    Module.getValue(xPtr, 'double') === SENTINEL && Module.getValue(xPtr + 8, 'double') === SENTINEL, true);
+
+  const qPtr = Module._malloc(4 * 8);
+  const rPtr = Module._malloc(4 * 8);
+  Module.setValue(qPtr, SENTINEL, 'double');
+  Module.setValue(rPtr, SENTINEL, 'double');
+  const qrInfo = qr(aPtr, 2, 2, qPtr, rPtr);
+  report('QR NaN in A returns InvalidInput', qrInfo, INVALID_INPUT);
+  report('QR NaN in A leaves buffers untouched',
+    Module.getValue(qPtr, 'double') === SENTINEL && Module.getValue(rPtr, 'double') === SENTINEL, true);
+
+  Module._free(aPtr);
+  Module._free(bPtr);
+  Module._free(xPtr);
+  Module._free(qPtr);
+  Module._free(rPtr);
+}
 
 process.exit(failed ? 1 : 0);

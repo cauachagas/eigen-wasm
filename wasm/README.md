@@ -71,54 +71,91 @@ than left as a comment.
 
 ## API
 
-Two exported functions.
+The module exports 19 C routines declared with `EMSCRIPTEN_KEEPALIVE` and `extern "C"`:
 
 ```c
-void matMul3x3(const double* a, const double* b, double* out);   // out = a * b
-int  determinant(const double* a, int rows, int cols, double* out);   // det = det(a)
+// System & Configuration
+int  maxDimension();
+
+// Matrix Multiplication
+void matMul3x3(const double* a, const double* b, double* out);
+int  matMul(const double* a, const double* b, int rowsA, int colsA, int colsB, double* out);
+
+// Determinant, Inversion & Linear Systems
+int  determinant(const double* a, int rows, int cols, double* out);
+int  solveLU(const double* a, const double* b, int n, double* out);
+int  inv(const double* a, int n, double* out);
+int  solveLeastSquares(const double* a, const double* b, int rows, int cols, double* x_out);
+
+// Factorizations & Decompositions
+int  cholesky(const double* a, int n, double* out);
+int  ldlt(const double* a, int n, double* l_out, double* d_out, int* trans_out);
+int  bunchKaufman(const double* a, int n, double* recon_out);
+int  qr(const double* a, int rows, int cols, double* q_out, double* r_out);
+int  colPivQr(const double* a, int rows, int cols, double* q_out, double* r_out, int* perm_out, int* rank_out);
+int  rank(const double* a, int rows, int cols, int* rank_out);
+
+// Singular Value Decomposition & Generation
+int  svd(const double* a, int rows, int cols, double* s_out, double* u_out, double* vt_out);
+int  svdSingularValues(const double* a, int rows, int cols, double* s_out);
+int  bdcSvd(const double* a, int rows, int cols, double* s_out, double* u_out, double* vt_out);
+int  generatePrescribedSingularValues(double* out, int rows, int cols, const double* s, int s_len, unsigned int seed);
+
+// Eigensolvers
+int  symmetricEigen(const double* a, int n, double* eigenvalues_out, double* eigenvectors_out);
+int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eivals, double* real_eivecs, double* imag_eivecs);
 ```
 
-`a`, `b`, and `out` of `matMul3x3` must each point to 9 doubles in row-major order,
-where `a[3 * i + j]` is row `i`, column `j`. `out` may alias `a` or `b`.
+### Common Conventions and Contracts
 
-## `determinant`
+1. **Memory Layout**: All matrices are laid out in contiguous row-major order: element `(i, j)` of a `rows x cols` matrix is located at index `cols * i + j`.
+2. **Buffer Allocation**: Callers allocate buffers in WebAssembly memory via `Module._malloc(bytes)` and free them with `Module._free(ptr)`.
+3. **Return Values**: Mathematical routines return an `int` corresponding verbatim to `Eigen::ComputationInfo`:
+   - `0`: `Success` - computation succeeded, output buffers written.
+   - `1`: `NumericalIssue` - singular matrix, non-positive definite, non-finite numerical result, or pivot failure.
+   - `2`: `NoConvergence` - iterative decomposition did not converge within the iteration budget.
+   - `3`: `InvalidInput` - precondition violation (null pointer, dimension <= 0, dimension > 255, non-square where required, asymmetric where required, or non-finite input).
+4. **Output Buffer Invariant**: **Output buffers are untouched unless the routine reports `Success`.** Every precondition is validated before results are written, so rejected calls leave memory completely unmodified. Callers can safely pass pre-filled sentinel buffers to verify contract compliance.
+5. **Aliasing**: `matMul3x3` allows `out` to alias `a` or `b`. For all other routines, input and output buffers must not overlap.
 
-```c
-int determinant(const double* a, int rows, int cols, double* out);
-```
+### Exported Routines Reference
 
-`a` points to `rows * cols` doubles in row-major order, `a[cols * i + j]` being row
-`i`, column `j`. `out` points to one double. On success `out` receives the determinant.
+#### System & Configuration
 
-Preconditions. All of them are checked inside the routine, and the routine returns
-`InvalidInput` rather than misbehaving when one fails:
+- `maxDimension()`: Returns the dimension ceiling (`255`).
 
-| Precondition | Why it is checked |
-|---|---|
-| `a` and `out` are non-null | a null pointer is a wiring mistake, not a result |
-| `rows >= 1` and `cols >= 1` | a zero or negative dimension describes no matrix |
-| `rows == cols` | the determinant is defined only for a square matrix |
-| `rows <= 255` | see the dimension ceiling below |
+#### Matrix Multiplication
 
-Return value. `int` carrying `Eigen::ComputationInfo` verbatim, with the enum's own
-numbering and no mapping: `Success` is `0`, `NumericalIssue` is `1`, `NoConvergence`
-is `2`, `InvalidInput` is `3`. A determinant cannot fail the way a factorization can,
-so this routine returns only the first and the last:
+- `matMul3x3(a, b, out)`: Computes fixed 3x3 matrix product `out = a * b`. `a`, `b`, and `out` each point to 9 doubles in row-major order. `out` may alias `a` or `b`.
+- `matMul(a, b, rowsA, colsA, colsB, out)`: Dynamic matrix multiplication `out = a * b`. `a` points to `rowsA * colsA` doubles, `b` to `colsA * colsB` doubles, and `out` to `rowsA * colsB` doubles (row-major). Returns `Success` (0) or `InvalidInput` (3).
 
-| Value | Meaning here |
-|---|---|
-| `Success` (0) | the determinant was computed and written to `out` |
-| `InvalidInput` (3) | a precondition above failed; nothing was attempted |
-| `NumericalIssue` (1) | never returned by this routine |
-| `NoConvergence` (2) | never returned by this routine |
+#### Determinant, Inversion & Linear Systems
 
-A singular matrix is a determinant of zero, not a failure: it reports `Success` and
-writes `0`.
+- `determinant(a, rows, cols, out)`: Determinant of square matrix `a` (`rows == cols`), written to `out` (1 double). A singular matrix returns `Success` with `0.0`. Returns `Success` or `InvalidInput`.
+- `solveLU(a, b, n, out)`: Solves linear system `A * x = b` via FullPivLU for `n x n` matrix `a` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (singular or non-finite solution), or `InvalidInput`.
+- `inv(a, n, out)`: Matrix inverse of `n x n` matrix `a` via FullPivLU, written to `out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue` (singular or non-finite inverse), or `InvalidInput`.
+- `solveLeastSquares(a, b, rows, cols, x_out)`: Solves least-squares problem minimizing `||A * x - b||` via HouseholderQR for `rows x cols` matrix `a` and `rows`-vector `b`. Solution written to `x_out` (`cols` doubles). Returns `Success`, `NumericalIssue` (non-finite solution), or `InvalidInput`.
 
-**Output buffers are untouched unless the routine reports `Success`.** Every
-precondition is checked before `out` is written, so a caller holding a stale buffer can
-never mistake it for a result. `test_determinant.js` pins this with an output buffer
-pre-filled with a sentinel and asserts the sentinel survives each rejected call.
+#### Factorizations & Decompositions
+
+- `cholesky(a, n, out)`: LLT Cholesky factorization of symmetric positive-definite `n x n` matrix `a`. Writes lower-triangular factor `L` to `out` (`n * n` doubles row-major). Input must satisfy symmetry tolerance (`|A[i,j] - A[j,i]| <= max(1e-12, min(|A[i,j]|, |A[j,i]|) * 1e-6)`). Returns `Success`, `NumericalIssue` (non-positive-definite), or `InvalidInput`.
+- `ldlt(a, n, l_out, d_out, trans_out)`: Robust LDLT decomposition for symmetric positive semi-definite `n x n` matrix `a` (`P^T * A * P = L * D * L^T`). `l_out` receives `n * n` doubles (unit lower triangular), `d_out` receives `n` doubles (diagonal vector D), and `trans_out` receives `n` integers (transposition indices). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
+- `bunchKaufman(a, n, recon_out)`: Bunch-Kaufman decomposition for symmetric indefinite `n x n` matrix `a`. Reconstructed matrix written to `recon_out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
+- `qr(a, rows, cols, q_out, r_out)`: Householder QR factorization (`A = Q * R`). Full orthogonal `Q` written to `q_out` (`rows * rows` doubles row-major); upper-triangular `R` written to `r_out` (`rows * cols` doubles row-major, lower triangle explicitly zeroed). Returns `Success` or `InvalidInput`.
+- `colPivQr(a, rows, cols, q_out, r_out, perm_out, rank_out)`: Column-pivoting Householder QR (`A * P = Q * R`) with rank detection. Full `Q` written to `q_out` (`rows * rows` doubles), upper-triangular `R` written to `r_out` (`rows * cols` doubles, lower triangle zeroed), column permutation indices written to `perm_out` (`cols` ints), numerical rank written to `rank_out` (1 int). Returns `Success` or `InvalidInput`.
+- `rank(a, rows, cols, rank_out)`: Standalone matrix rank computation via ColPivHouseholderQR. Numerical rank written to `rank_out` (1 int). Returns `Success` or `InvalidInput`.
+
+#### Singular Value Decomposition & Generation
+
+- `svd(a, rows, cols, s_out, u_out, vt_out)`: Thin singular value decomposition via JacobiSVD. Let `k = min(rows, cols)`. Singular values written to `s_out` (`k` doubles in descending order), thin `U` written to `u_out` (`rows * k` doubles), and thin `V^T` written to `vt_out` (`k * cols` doubles). Returns `Success` or `InvalidInput`.
+- `svdSingularValues(a, rows, cols, s_out)`: Computes only singular values via JacobiSVD without computing unitary matrices `U` and `V`. Written to `s_out` (`min(rows, cols)` doubles). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
+- `bdcSvd(a, rows, cols, s_out, u_out, vt_out)`: Thin SVD via bidiagonal divide and conquer (`BDCSVD`), optimized for large matrices (`k = min(rows, cols)`). Layout identical to `svd`. Returns `Success` or `InvalidInput`.
+- `generatePrescribedSingularValues(out, rows, cols, s, s_len, seed)`: Deterministic matrix generator constructing a `rows x cols` matrix with prescribed singular values `s` (`s_len >= min(rows, cols)`) using an explicit platform-independent linear congruential generator and Gram-Schmidt orthogonalization. Written to `out` (`rows * cols` doubles row-major). Returns `Success` or `InvalidInput`.
+
+#### Eigensolvers
+
+- `symmetricEigen(a, n, eigenvalues_out, eigenvectors_out)`: Eigendecomposition of symmetric `n x n` matrix `a` via SelfAdjointEigenSolver. Eigenvalues in ascending order written to `eigenvalues_out` (`n` doubles), column eigenvectors written to `eigenvectors_out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
+- `generalEigen(a, n, real_eivals, imag_eivals, real_eivecs, imag_eivecs)`: General eigensolver for real non-symmetric `n x n` matrices via RealSchur (`EigenSolver`). Real and imaginary parts of eigenvalues written to `real_eivals` and `imag_eivals` (`n` doubles each); real and imaginary parts of eigenvectors written to `real_eivecs` and `imag_eivecs` (`n * n` doubles each in row-major). Returns `Success`, `NoConvergence`, `NumericalIssue`, or `InvalidInput`.
 
 ### Dimension ceiling: 255, not 320
 
@@ -195,7 +232,7 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | File | Purpose |
 |---|---|
 | `build.sh` | `em++` invocation and output paths |
-| `eigen_wasm.cpp` | `matMul3x3`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `matMul`, `svd`, `symmetricEigen`, `ldlt`, `bunchKaufman`, `colPivQr`, `generatePrescribedSingularValues`, `bdcSvd`, `generalEigen`, `maxDimension` |
+| `eigen_wasm.cpp` | `matMul3x3`, `matMul`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `svd`, `svdSingularValues`, `symmetricEigen`, `ldlt`, `bunchKaufman`, `colPivQr`, `rank`, `generatePrescribedSingularValues`, `bdcSvd`, `generalEigen`, `maxDimension` |
 | `example.js` | Worked example; imported and run by the tests |
 | `test_helpers.js` | Shared test assertions, error constants, buffer helpers, and sentinels |
 | `test_matmul.js` | Table-driven tests over `matMul3x3` |

@@ -1,4 +1,4 @@
-Retrospectiva da Sessão 
+Retrospectiva da Sessão
 
 Esta retrospectiva analisa o histórico da sessão recente — incluindo o desenvolvimento do módulo WebAssembly, a resolução dos Tickets
 004 a 013, o uso de subagentes e o fluxo de TDD — propondo melhorias concretas para o ambiente do agente.
@@ -68,4 +68,4 @@ Actions (.github/workflows/wasm.yml), mas a documentação e os scripts locais n
     • **Tolerância de Simetria (Resolvido):** Criado helper `isSymmetric(a, n)` utilizando `std::max(1e-12, mag * 1e-6)` canônico do Eigen, evitando falsos positivos com números minúsculos.
     • **Endurecimento de solveLU e inv (Resolvido):** Adicionada validação explícita `allFinite()` nas soluções e inversas para capturar matrizes quase-singulares que escapam de `isInvertible()`.
     • **Validação de Limites em matMul (Resolvido):** `matMul` agora valida estritamente `validDim(rowsA)`, `validDim(colsA)` e `validDim(colsB)`, acompanhado de testes de contrato com sentinela em `test_qr.js`.
-    • **Inicialização de triangularView no QR (Falso Positivo Descartado):** O reviewer apontou risco de lixo de memória na atribuição de `triangularView<Eigen::Upper>()` para `RowMajorMatrix R`. O comportamento do Eigen avalia e zera explicitamente o triângulo oposto, comprovado experimentalmente para matrizes quadradas e retangulares ($3 \times 2$ e $2 \times 3$).
+    • **Inicialização de triangularView no QR (Falso Positivo Descartado):** O reviewer apontou risco de lixo de memória na atribuição de `triangularView<Eigen::Upper>()` para `RowMajorMatrix R`. O comportamento do Eigen avalia e zera explicitamente o triângulo oposto, comprovado experimentalmente para matrizes quadradas e retangulares (3x2 e 2x3).

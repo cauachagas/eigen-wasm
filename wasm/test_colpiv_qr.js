@@ -7,6 +7,7 @@ import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
 const colPivQr = Module.cwrap('colPivQr', 'number', ['number', 'number', 'number', 'number', 'number', 'number', 'number']);
+const rank = Module.cwrap('rank', 'number', ['number', 'number', 'number', 'number']);
 const generatePrescribedSingularValues = Module.cwrap('generatePrescribedSingularValues', 'number', ['number', 'number', 'number', 'number', 'number', 'number']);
 const maxDimension = Module.cwrap('maxDimension', 'number', []);
 
@@ -68,6 +69,7 @@ function readInts(ptr, count) {
   // 2. ColPivHouseholderQR rank detection on this generated rank-2 matrix
   const qPtr = Module._malloc(rows * rows * 8);
   const rPtr = Module._malloc(rows * cols * 8);
+  for (let i = 0; i < rows * cols; i++) Module.setValue(rPtr + i * 8, SENTINEL, 'double');
   const permPtr = Module._malloc(cols * 4);
   const rankPtr = Module._malloc(4);
 
@@ -77,6 +79,30 @@ function readInts(ptr, count) {
   const computedRank = Module.getValue(rankPtr, 'i32');
   report('colPivQr rank matches prescribed rank (2)', computedRank, 2);
 
+  // Check R strictly upper triangular (entries with i > j must be 0.0)
+  const R = readDoubles(rPtr, rows * cols);
+  let lowerZero = true;
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j < cols; j++) {
+      if (i > j && R[i * cols + j] !== 0) {
+        lowerZero = false;
+      }
+    }
+  }
+  if (!lowerZero) failed++;
+  report('colPivQr R strictly upper triangular (zeros below diagonal)', lowerZero, true);
+
+  // 3. Rejection of NaN input
+  const nanMat = [NaN, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  const nanPtr = alloc(nanMat);
+  Module.setValue(qPtr, SENTINEL, 'double');
+  Module.setValue(rPtr, SENTINEL, 'double');
+  const nanInfo = colPivQr(nanPtr, rows, cols, qPtr, rPtr, permPtr, rankPtr);
+  report('colPivQr NaN input returns InvalidInput', nanInfo, INVALID_INPUT);
+  report('colPivQr NaN input leaves buffers untouched',
+    Module.getValue(qPtr, 'double') === SENTINEL && Module.getValue(rPtr, 'double') === SENTINEL, true);
+  Module._free(nanPtr);
+
   Module._free(sPtr);
   Module._free(outPtr1);
   Module._free(outPtr2);
@@ -84,6 +110,43 @@ function readInts(ptr, count) {
   Module._free(rPtr);
   Module._free(permPtr);
   Module._free(rankPtr);
+}
+
+// 4. Test standalone rank routine
+{
+  const rankOutPtr = Module._malloc(4);
+  Module.setValue(rankOutPtr, -999, 'i32');
+
+  // Full rank 2x2 identity
+  const idMat = [1, 0, 0, 1];
+  const idPtr = alloc(idMat);
+  const info1 = rank(idPtr, 2, 2, rankOutPtr);
+  report('rank identity info', info1, SUCCESS);
+  report('rank identity is 2', Module.getValue(rankOutPtr, 'i32'), 2);
+  Module._free(idPtr);
+
+  // Rank 1 2x2 matrix
+  const r1Mat = [1, 2, 2, 4];
+  const r1Ptr = alloc(r1Mat);
+  const info2 = rank(r1Ptr, 2, 2, rankOutPtr);
+  report('rank rank-1 info', info2, SUCCESS);
+  report('rank rank-1 is 1', Module.getValue(rankOutPtr, 'i32'), 1);
+  Module._free(r1Ptr);
+
+  // Non-finite input
+  Module.setValue(rankOutPtr, -999, 'i32');
+  const nanMat = [NaN, 1, 2, 3];
+  const nanPtr = alloc(nanMat);
+  const nanInfo = rank(nanPtr, 2, 2, rankOutPtr);
+  report('rank non-finite input returns InvalidInput', nanInfo, INVALID_INPUT);
+  report('rank non-finite leaves output untouched', Module.getValue(rankOutPtr, 'i32'), -999);
+  Module._free(nanPtr);
+
+  // Null input
+  const nullInfo = rank(0, 2, 2, rankOutPtr);
+  report('rank null input returns InvalidInput', nullInfo, INVALID_INPUT);
+
+  Module._free(rankOutPtr);
 }
 
 process.exit(failed ? 1 : 0);

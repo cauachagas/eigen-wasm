@@ -10,7 +10,7 @@ import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
 const solveLU = Module.cwrap('solveLU', 'number', ['number', 'number', 'number', 'number']);
-const inv = Module.cwrap('inv', 'number', ['number', 'number', 'number', 'number']);
+const inv = Module.cwrap('inv', 'number', ['number', 'number', 'number']);
 const maxDimension = Module.cwrap('maxDimension', 'number', []);
 
 // Eigen::ComputationInfo enum values verbatim
@@ -159,7 +159,7 @@ function testInv(name, A_vals, n, expectedInv) {
     aPtr = alloc(A_vals);
     invPtr = Module._malloc(n * n * 8);
 
-    const info = inv(aPtr, n, n, invPtr);
+    const info = inv(aPtr, n, invPtr);
     report(`${name}: info`, info, SUCCESS);
 
     const invA = readDoubles(invPtr, n * n);
@@ -237,7 +237,7 @@ testInv('inv 2x2', [4, 7, 2, 6], 2, [0.6, -0.7, -0.2, 0.4]);
     invOutPtr = Module._malloc(4 * 8);
     for (let i = 0; i < 4; i++) Module.setValue(invOutPtr + i * 8, SENTINEL, 'double');
 
-    const info = inv(aPtr, 2, 2, invOutPtr);
+    const info = inv(aPtr, 2, invOutPtr);
     report('inv singular returns NumericalIssue', info, NUMERICAL_ISSUE);
 
     const untouched = readDoubles(invOutPtr, 4).every(v => v === SENTINEL);
@@ -251,24 +251,24 @@ testInv('inv 2x2', [4, 7, 2, 6], 2, [0.6, -0.7, -0.2, 0.4]);
   }
 }
 
-// --- 4. Contract checks on InvalidInput: rectangular, null, non-positive, ceiling ---
+// --- 4. Contract checks on InvalidInput: non-finite, null, non-positive, ceiling ---
 
-// inv with rectangular input (rows != cols)
+// inv with non-finite input (NaN)
 {
   let aPtr = 0, outPtr = 0;
   try {
-    aPtr = alloc([1, 2, 3, 4, 5, 6]);
-    outPtr = Module._malloc(6 * 8);
-    for (let i = 0; i < 6; i++) Module.setValue(outPtr + i * 8, SENTINEL, 'double');
+    aPtr = alloc([NaN, 2, 3, 4]);
+    outPtr = Module._malloc(4 * 8);
+    for (let i = 0; i < 4; i++) Module.setValue(outPtr + i * 8, SENTINEL, 'double');
 
-    const info = inv(aPtr, 2, 3, outPtr);
-    report('inv rectangular (2x3) returns InvalidInput', info, INVALID_INPUT);
+    const info = inv(aPtr, 2, outPtr);
+    report('inv non-finite input returns InvalidInput', info, INVALID_INPUT);
 
-    const untouched = readDoubles(outPtr, 6).every(v => v === SENTINEL);
-    report('inv rectangular leaves output untouched', untouched, true);
+    const untouched = readDoubles(outPtr, 4).every(v => v === SENTINEL);
+    report('inv non-finite leaves output untouched', untouched, true);
   } catch (err) {
     failed++;
-    console.error(`not ok - inv rectangular threw error: ${err.message}`);
+    console.error(`not ok - inv non-finite threw error: ${err.message}`);
   } finally {
     if (aPtr !== 0) Module._free(aPtr);
     if (outPtr !== 0) Module._free(outPtr);
@@ -314,24 +314,24 @@ for (const [name, A_vals, b_vals, n] of solveLURejected) {
 
 // Invalid inputs for inv
 const invRejected = [
-  ['null matrix pointer', null, 2, 2],
-  ['null out pointer', [1, 2, 3, 4], 2, 2],
-  ['zero rows', [1], 0, 0],
-  ['negative rows', [1], -2, -2],
-  ['above ceiling', [1], MAX_DIMENSION + 1, MAX_DIMENSION + 1],
+  ['null matrix pointer', null, 2],
+  ['null out pointer', [1, 2, 3, 4], 2],
+  ['zero dimension', [1], 0],
+  ['negative dimension', [1], -2],
+  ['above ceiling', [1], MAX_DIMENSION + 1],
 ];
 
-for (const [name, A_vals, rows, cols] of invRejected) {
+for (const [name, A_vals, n] of invRejected) {
   const hasOut = name !== 'null out pointer';
   const aPtr = A_vals === null ? 0 : alloc(A_vals);
-  const count = Math.max(rows * cols, 1);
+  const count = Math.max(n * n, 1);
   const outPtr = hasOut ? Module._malloc(count * 8) : 0;
   if (hasOut) {
     for (let i = 0; i < count; i++) Module.setValue(outPtr + i * 8, SENTINEL, 'double');
   }
 
   try {
-    const info = inv(aPtr, rows, cols, outPtr);
+    const info = inv(aPtr, n, outPtr);
     report(`inv ${name} returns InvalidInput`, info, INVALID_INPUT);
 
     if (hasOut) {

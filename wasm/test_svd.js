@@ -13,6 +13,7 @@ import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
 const svd = Module.cwrap('svd', 'number', ['number', 'number', 'number', 'number', 'number', 'number']);
+const svdSingularValues = Module.cwrap('svdSingularValues', 'number', ['number', 'number', 'number', 'number']);
 const maxDimension = Module.cwrap('maxDimension', 'number', []);
 
 const SUCCESS = 0;
@@ -190,6 +191,48 @@ for (const [name, A_vals, rows, cols] of rejected) {
     Module._free(sPtr);
     Module._free(uPtr);
     Module._free(vtPtr);
+  }
+}
+
+// Test svdSingularValues
+{
+  const diagA = [
+    3, 0,
+    0, -2,
+  ];
+  let aPtr = 0, sPtr = 0;
+  try {
+    aPtr = alloc(diagA);
+    sPtr = Module._malloc(2 * 8);
+    Module.setValue(sPtr, SENTINEL, 'double');
+    Module.setValue(sPtr + 8, SENTINEL, 'double');
+
+    const info = svdSingularValues(aPtr, 2, 2, sPtr);
+    report('svdSingularValues info', info, SUCCESS);
+
+    const s = readDoubles(sPtr, 2);
+    const descending = s[0] >= s[1];
+    report('svdSingularValues descending', descending, true);
+    report('svdSingularValues S[0]', Math.abs(s[0] - 3.0) <= PRECISION, true);
+    report('svdSingularValues S[1]', Math.abs(s[1] - 2.0) <= PRECISION, true);
+
+    // Non-finite input
+    const nanMat = [NaN, 0, 0, 1];
+    const nanPtr = alloc(nanMat);
+    Module.setValue(sPtr, SENTINEL, 'double');
+    Module.setValue(sPtr + 8, SENTINEL, 'double');
+    const nanInfo = svdSingularValues(nanPtr, 2, 2, sPtr);
+    report('svdSingularValues non-finite input returns InvalidInput', nanInfo, INVALID_INPUT);
+    report('svdSingularValues non-finite leaves output untouched',
+      Module.getValue(sPtr, 'double') === SENTINEL && Module.getValue(sPtr + 8, 'double') === SENTINEL, true);
+    Module._free(nanPtr);
+
+    // Null input
+    const nullInfo = svdSingularValues(0, 2, 2, sPtr);
+    report('svdSingularValues null input returns InvalidInput', nullInfo, INVALID_INPUT);
+  } finally {
+    if (aPtr !== 0) Module._free(aPtr);
+    if (sPtr !== 0) Module._free(sPtr);
   }
 }
 

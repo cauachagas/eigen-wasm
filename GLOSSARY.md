@@ -74,6 +74,14 @@ the Eigen test suite's 320, because at 256 and above the blocked LU behind `Matr
 enters a nested panel update that reads out of bounds and traps the module. Guarding it turns the
 trap into `InvalidInput`.
 
+**Contract bug**: A defect in an exported routine where observable behavior breaks the published
+`ABI_CONTRACT.md`, including uninitialized buffer memory, returning `Success` for non-converged or
+failed factorizations, overwriting buffers on failure, or deviating from canonical function signatures.
+
+**Untouched invariant**: The contract guarantee that caller-supplied output buffers are completely
+unmodified unless the routine returns `Success`. Any failure—including `InvalidInput`, `NumericalIssue`,
+or `NoConvergence`—must leave pre-existing buffer contents (e.g. sentinels) intact.
+
 ## Verification
 
 **Residual**: For a claimed solution or factorization, the norm of the difference between the claimed
