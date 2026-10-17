@@ -8,6 +8,10 @@ import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
 
+// A 3x3 matrix of doubles is 9 * 8 bytes; a float32 layout would halve both.
+const N = 9;
+const BYTES = N * 8;
+
 const cases = [
   ['identity * m returns m (catches transposition)',
     [1, 0, 0, 0, 1, 0, 0, 0, 1],
@@ -19,27 +23,28 @@ const cases = [
     [30, 24, 18, 84, 69, 54, 138, 114, 90]],
 ];
 
-// eigen_wasm.cpp documents that `out` may alias `a` or `b`. That promise depends on
-// the product being evaluated into a temporary before the assignment stores to `out`,
-// which is an implementation detail of Eigen's evaluator. These two cases hold the
-// contract down; without them a change in evaluation order would break it silently.
-const ALIAS = ['out aliases a', 'out aliases b'];
-
 let failed = 0;
-for (const [name, a, b, expected] of cases) {
-  const aPtr = Module._malloc(72);
-  const bPtr = Module._malloc(72);
-  const outPtr = Module._malloc(72);
-  for (let i = 0; i < 9; i++) {
+
+// `alias` selects which input the output buffer is overlaid on: null for a separate
+// buffer, 'a' or 'b' to hand out an aliased pointer. eigen_wasm.cpp documents that
+// aliasing is allowed, and the two aliased cases below hold that promise down.
+function runCase(name, a, b, expected, alias) {
+  const aPtr = Module._malloc(BYTES);
+  const bPtr = Module._malloc(BYTES);
+  for (let i = 0; i < N; i++) {
     Module.setValue(aPtr + i * 8, a[i], 'double');
     Module.setValue(bPtr + i * 8, b[i], 'double');
   }
 
+  const outPtr = alias === 'a' ? aPtr : alias === 'b' ? bPtr : Module._malloc(BYTES);
   Module.ccall('matMul3x3', null, ['number', 'number', 'number'], [aPtr, bPtr, outPtr]);
 
+  // Read out before freeing: getValue copies into JS, so the numbers survive the free,
+  // but reading after the free would depend on that being true.
   const result = [];
-  for (let i = 0; i < 9; i++) result.push(Module.getValue(outPtr + i * 8, 'double'));
-  Module._free(aPtr); Module._free(bPtr); Module._free(outPtr);
+  for (let i = 0; i < N; i++) result.push(Module.getValue(outPtr + i * 8, 'double'));
+  Module._free(aPtr); Module._free(bPtr);
+  if (alias === null) Module._free(outPtr);
 
   try {
     assert.deepEqual(result, expected);
@@ -50,29 +55,13 @@ for (const [name, a, b, expected] of cases) {
   }
 }
 
-const [, aliasA, aliasB, aliasExpected] = cases[1];
-for (const [label, aliased] of [[ALIAS[0], 'a'], [ALIAS[1], 'b']]) {
-  const aPtr = Module._malloc(72);
-  const bPtr = Module._malloc(72);
-  for (let i = 0; i < 9; i++) {
-    Module.setValue(aPtr + i * 8, aliasA[i], 'double');
-    Module.setValue(bPtr + i * 8, aliasB[i], 'double');
-  }
+for (const [name, a, b, expected] of cases) runCase(name, a, b, expected, null);
 
-  const outPtr = aliased === 'a' ? aPtr : bPtr;   // deliberately aliased
-  Module.ccall('matMul3x3', null, ['number', 'number', 'number'], [aPtr, bPtr, outPtr]);
-
-  const result = [];
-  for (let i = 0; i < 9; i++) result.push(Module.getValue(outPtr + i * 8, 'double'));
-  Module._free(aPtr); Module._free(bPtr);
-
-  try {
-    assert.deepEqual(result, aliasExpected);
-    console.log(`ok - ${label} (out === ${label === ALIAS[0] ? 'a' : 'b'})`);
-  } catch (e) {
-    failed++;
-    console.error(`not ok - ${label}\n  got:      ${result}\n  expected: ${aliasExpected}`);
-  }
-}
+// The aliasing guarantee rests on Eigen evaluating the product into a temporary
+// before the assignment stores into `out`, which is an evaluator implementation detail
+// and not something to leave as a comment in eigen_wasm.cpp.
+const [, a, b, expected] = cases[1];
+runCase('out aliases a', a, b, expected, 'a');
+runCase('out aliases b', a, b, expected, 'b');
 
 process.exit(failed ? 1 : 0);

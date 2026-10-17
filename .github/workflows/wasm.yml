@@ -25,6 +25,7 @@ on:
       - 'wasm/**'
       - 'Eigen/**'
       - '.github/workflows/wasm.yml'
+  workflow_dispatch:
 
 jobs:
   build-and-test:
