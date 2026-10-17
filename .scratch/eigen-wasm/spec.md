@@ -1,12 +1,52 @@
 # Eigen WASM MVP Spec
 
-Objective: Reproduce Eigen build in WebAssembly with Core+Dense.
+Objective: Reproduce an Eigen build in WebAssembly with Core+Dense.
 
-Build: build.sh using emcc -O3 --bind -s ALLOW_MEMORY_GROWTH=1 -s EXPORT_ES6=1 -s MODULARIZE=1
+## Build
 
-Deliverables:
-- eigen_wasm.cpp exposing matMul(MatrixXd,MatrixXd) -> MatrixXd
-- build.sh produces eigen_wasm.js + .wasm
-- Node/browser test validates matMul result
+`wasm/build.sh` invoking emcc:
 
-Non-goals: Sparse, SVD, threading.
+| Flag | Value | Why |
+|---|---|---|
+| `-O3` | | optimization |
+| `-I<repo root>` | | `Eigen/` lives at the repo root, source lives in `wasm/` |
+| `-std=c++17` | | required by Emscripten, not by Eigen (Eigen is C++14) |
+| `-s ALLOW_MEMORY_GROWTH=1` | | |
+| `-s EXPORT_ES6=1` | | ES module output |
+| `-s MODULARIZE=1` | | factory function instead of a global |
+| `-s EXPORT_NAME=EigenWasmModule` | | importable name |
+| `-s EXPORTED_FUNCTIONS` | `_matMul3x3`, `_malloc`, `_free` | callers allocate their own buffers |
+| `-s EXPORTED_RUNTIME_METHODS` | `ccall`, `cwrap`, `setValue`, `getValue` | JS-side memory access |
+
+## Deliverables
+
+- `wasm/eigen_wasm.cpp` exposing `matMul3x3(const double* a, const double* b, double* out)`, computing `out = a * b` for row-major 3x3 matrices.
+- `wasm/build.sh` producing `wasm/eigen_wasm.js` and `wasm/eigen_wasm.wasm`, both gitignored.
+- `wasm/test_matmul.js`, a Node test validating `matMul3x3` and exiting non-zero on mismatch.
+- `wasm/README.md` documenting the build, the test, and the calling contract.
+
+## Decisions taken during implementation
+
+These depart from the original MVP wording. Each is deliberate; the original
+plan is recorded in `.scratch/eigen-wasm/issues/` for history.
+
+1. **No `--bind`, no embind.** The wrapper is plain C marked `EMSCRIPTEN_KEEPALIVE`,
+   and JS drives it through `ccall`/`cwrap`. embind would add a code-generation step
+   and a runtime library to buy nothing for two raw-pointer functions.
+2. **`matMul3x3`, not `matMul(MatrixXd, MatrixXd) -> MatrixXd`.** A fixed 3x3
+   row-major API matches the MVP's actual goal of proving the toolchain end to end.
+   Crossing the C++ boundary with `MatrixXd` would require either embind or manual
+   size marshalling, and neither is wanted before there is a second operation.
+   Growing to other sizes means adding functions, or switching to embind.
+3. **Node only, no browser test.** The module is exported as an ES module and was
+   validated under Node. Nothing exercises a real browser: import resolution, the
+   `.wasm` fetch, and page-embedding behaviour are unverified.
+4. **`Eigen/Dense`, matching the stated objective, though only `Eigen/Core` is used.**
+   `Eigen/Dense` also pulls in SVD and Cholesky. Switching to the narrower
+   `Eigen/Core` would honour the non-goals literally at no cost, since 3x3 products
+   need only core coefficient arithmetic.
+
+## Non-goals
+
+Sparse, SVD, threading. `Eigen/Dense` is included per decision 4, so SVD is
+compiled in but never called.
