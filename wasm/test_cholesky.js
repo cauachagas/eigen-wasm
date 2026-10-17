@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import EigenWasmModule from './eigen_wasm.js';
 
 const Module = await EigenWasmModule();
-const cholesky = Module.cwrap('cholesky', 'number', ['number', 'number', 'number', 'number']);
+const cholesky = Module.cwrap('cholesky', 'number', ['number', 'number', 'number']);
 const maxDimension = Module.cwrap('maxDimension', 'number', []);
 
 const SUCCESS = 0;
@@ -70,7 +70,7 @@ function testCholesky(name, A_vals, n, expectedL) {
     aPtr = alloc(A_vals);
     lPtr = Module._malloc(n * n * 8);
 
-    const info = cholesky(aPtr, n, n, lPtr);
+    const info = cholesky(aPtr, n, lPtr);
     report(`${name}: info`, info, SUCCESS);
 
     const L = readDoubles(lPtr, n * n);
@@ -170,25 +170,24 @@ testCholesky('3x3', [4, 12, -16, 12, 45, -54, -16, -54, 77], 3, [2, 0, 0, 6, 3, 
 
 // Precondition checks
 const rejected = [
-  ['null matrix pointer', null, 2, 2],
-  ['null out pointer', [4, 2, 2, 4], 2, 2],
-  ['zero rows', [4], 0, 0],
-  ['negative rows', [4], -1, -1],
-  ['non-square (2x3)', [1, 2, 3, 4, 5, 6], 2, 3],
-  ['above ceiling', [4], MAX_DIMENSION + 1, MAX_DIMENSION + 1],
+  ['null matrix pointer', null, 2],
+  ['null out pointer', [4, 2, 2, 4], 2],
+  ['zero dimension', [4], 0],
+  ['negative dimension', [4], -1],
+  ['above ceiling', [4], MAX_DIMENSION + 1],
 ];
 
-for (const [name, A_vals, rows, cols] of rejected) {
+for (const [name, A_vals, n] of rejected) {
   const hasOut = name !== 'null out pointer';
   const aPtr = A_vals === null ? 0 : alloc(A_vals);
-  const count = Math.max(rows * cols, 1);
+  const count = Math.max(n * n, 1);
   const outPtr = hasOut ? Module._malloc(count * 8) : 0;
   if (hasOut) {
     for (let i = 0; i < count; i++) Module.setValue(outPtr + i * 8, SENTINEL, 'double');
   }
 
   try {
-    const info = cholesky(aPtr, rows, cols, outPtr);
+    const info = cholesky(aPtr, n, outPtr);
     report(`cholesky ${name}: InvalidInput`, info, INVALID_INPUT);
 
     if (hasOut) {

@@ -27,9 +27,9 @@ static inline bool validDim(int r, int c) {
 static inline bool isSymmetric(const double* a, int n) {
   for (int i = 0; i < n; ++i) {
     for (int j = i + 1; j < n; ++j) {
-      double diff = std::abs(a[i * n + j] - a[j * n + i]);
-      double mag = std::max(std::abs(a[i * n + j]), std::abs(a[j * n + i]));
-      double tol = std::max(1e-12, mag * 1e-6);
+      double diff = Eigen::numext::abs(a[i * n + j] - a[j * n + i]);
+      double mag = Eigen::numext::mini(Eigen::numext::abs(a[i * n + j]), Eigen::numext::abs(a[j * n + i]));
+      double tol = Eigen::numext::maxi(1e-12, mag * 1e-6);
       if (diff > tol) {
         return false;
       }
@@ -69,7 +69,11 @@ int determinant(const double* a, int rows, int cols, double* out) {
   if (a == nullptr || out == nullptr || !validDim(rows, cols) || rows != cols) {
     return Eigen::InvalidInput;
   }
-  *out = Eigen::Map<const RowMajorMatrix>(a, rows, cols).determinant();
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  *out = A.determinant();
   return Eigen::Success;
 }
 
@@ -83,11 +87,14 @@ int solveLU(const double* a, const double* b, int n, double* out) {
     return Eigen::InvalidInput;
   }
   Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!A.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::FullPivLU<RowMajorMatrix> lu(A);
   if (!lu.isInvertible()) {
     return Eigen::NumericalIssue;
   }
-  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
   Eigen::VectorXd x = lu.solve(rhs);
   if (!x.allFinite()) {
     return Eigen::NumericalIssue;
@@ -99,14 +106,17 @@ int solveLU(const double* a, const double* b, int n, double* out) {
 }
 
 // Inverse of an n-by-n row-major matrix A, written to caller-allocated out buffer.
-// Returns Success, NumericalIssue (if singular or non-finite), or InvalidInput (non-square, null, out of range).
+// Returns Success, NumericalIssue (if singular or non-finite), or InvalidInput (null, out of range).
 // Leaves out untouched on failure.
 EMSCRIPTEN_KEEPALIVE
-int inv(const double* a, int rows, int cols, double* out) {
-  if (a == nullptr || out == nullptr || !validDim(rows, cols) || rows != cols) {
+int inv(const double* a, int n, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(n)) {
     return Eigen::InvalidInput;
   }
-  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::FullPivLU<RowMajorMatrix> lu(A);
   if (!lu.isInvertible()) {
     return Eigen::NumericalIssue;
@@ -115,7 +125,7 @@ int inv(const double* a, int rows, int cols, double* out) {
   if (!inverseMat.allFinite()) {
     return Eigen::NumericalIssue;
   }
-  int totalEntries = rows * cols;
+  int totalEntries = n * n;
   for (int i = 0; i < totalEntries; ++i) {
     out[i] = inverseMat.data()[i];
   }
@@ -124,26 +134,29 @@ int inv(const double* a, int rows, int cols, double* out) {
 
 // Cholesky decomposition (LLT).
 // Preconditions: A is n-by-n symmetric positive-definite, out is n-by-n row-major.
-// If A is asymmetric or invalid dimensions/pointers, returns InvalidInput.
+// If A is asymmetric, non-finite, or invalid dimensions/pointers, returns InvalidInput.
 // If A is not positive-definite, returns NumericalIssue.
 // Leaves out untouched on failure.
 EMSCRIPTEN_KEEPALIVE
-int cholesky(const double* a, int rows, int cols, double* out) {
-  if (a == nullptr || out == nullptr || !validDim(rows, cols) || rows != cols) {
+int cholesky(const double* a, int n, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(n)) {
     return Eigen::InvalidInput;
   }
-  if (!isSymmetric(a, rows)) {
+  if (!isSymmetric(a, n)) {
     return Eigen::InvalidInput;
   }
 
-  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::LLT<RowMajorMatrix> llt(A);
   if (llt.info() != Eigen::Success) {
     return llt.info(); // Returns NumericalIssue if not positive-definite
   }
 
   RowMajorMatrix L = llt.matrixL();
-  int totalEntries = rows * cols;
+  int totalEntries = n * n;
   for (int i = 0; i < totalEntries; ++i) {
     out[i] = L.data()[i];
   }
@@ -152,7 +165,7 @@ int cholesky(const double* a, int rows, int cols, double* out) {
 
 
 // QR factorization via HouseholderQR.
-// Produces full Q (rows x rows) and upper triangular R (rows x cols).
+// Produces full Q (rows x rows) and strictly upper triangular R (rows x cols).
 // Returns Success or InvalidInput.
 EMSCRIPTEN_KEEPALIVE
 int qr(const double* a, int rows, int cols, double* q_out, double* r_out) {
@@ -161,10 +174,18 @@ int qr(const double* a, int rows, int cols, double* q_out, double* r_out) {
   }
 
   Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
   Eigen::HouseholderQR<RowMajorMatrix> householderQr(A);
+  if (householderQr.info() != Eigen::Success) {
+    return householderQr.info();
+  }
 
   RowMajorMatrix Q = householderQr.householderQ();
-  RowMajorMatrix R = householderQr.matrixQR().template triangularView<Eigen::Upper>();
+  RowMajorMatrix R = RowMajorMatrix::Zero(rows, cols);
+  R.template triangularView<Eigen::Upper>() = householderQr.matrixQR().template triangularView<Eigen::Upper>();
 
   int qEntries = rows * rows;
   for (int i = 0; i < qEntries; ++i) {
@@ -181,7 +202,8 @@ int qr(const double* a, int rows, int cols, double* q_out, double* r_out) {
 
 // Least squares solver via HouseholderQR.
 // Solves min ||A x - b|| for rectangular A (rows x cols) and b (rows-vector).
-// Returns Success or InvalidInput.
+// Returns Success, NumericalIssue (if solution non-finite), or InvalidInput.
+// Leaves out untouched on failure.
 EMSCRIPTEN_KEEPALIVE
 int solveLeastSquares(const double* a, const double* b, int rows, int cols, double* x_out) {
   if (a == nullptr || b == nullptr || x_out == nullptr || !validDim(rows, cols)) {
@@ -190,8 +212,19 @@ int solveLeastSquares(const double* a, const double* b, int rows, int cols, doub
 
   Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
   Eigen::Map<const Eigen::VectorXd> rhs(b, rows);
+  if (!A.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
   Eigen::HouseholderQR<RowMajorMatrix> householderQr(A);
+  if (householderQr.info() != Eigen::Success) {
+    return householderQr.info();
+  }
+
   Eigen::VectorXd x = householderQr.solve(rhs);
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
 
   for (int i = 0; i < cols; ++i) {
     x_out[i] = x[i];
@@ -243,7 +276,7 @@ int svd(const double* a, int rows, int cols, double* s_out, double* u_out, doubl
     return jacobiSvd.info();
   }
 
-  int k = std::min(rows, cols);
+  int k = Eigen::numext::mini(rows, cols);
   const auto& s = jacobiSvd.singularValues();
   for (int i = 0; i < k; ++i) {
     s_out[i] = s[i];
@@ -264,6 +297,36 @@ int svd(const double* a, int rows, int cols, double* s_out, double* u_out, doubl
   return Eigen::Success;
 }
 
+// SVD singular values only (without U and V matrices).
+// Preconditions:
+//   s_out points to min(rows, cols) doubles.
+// Returns Success, InvalidInput (null, invalid dim, non-finite), or NumericalIssue.
+// Leaves s_out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int svdSingularValues(const double* a, int rows, int cols, double* s_out) {
+  if (a == nullptr || s_out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::JacobiSVD<RowMajorMatrix> jacobiSvd(A);
+  if (jacobiSvd.info() != Eigen::Success) {
+    return jacobiSvd.info();
+  }
+
+  int k = Eigen::numext::mini(rows, cols);
+  const auto& s = jacobiSvd.singularValues();
+  for (int i = 0; i < k; ++i) {
+    s_out[i] = s[i];
+  }
+
+  return Eigen::Success;
+}
+
 // Symmetric eigensolver via SelfAdjointEigenSolver.
 // Preconditions: A is n-by-n symmetric matrix.
 // Returns Success, InvalidInput (asymmetric, null, invalid n), or NumericalIssue.
@@ -277,6 +340,9 @@ int symmetricEigen(const double* a, int n, double* eigenvalues_out, double* eige
   }
 
   Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::SelfAdjointEigenSolver<RowMajorMatrix> solver(A);
   if (solver.info() != Eigen::Success) {
     return solver.info();
@@ -309,6 +375,9 @@ int ldlt(const double* a, int n, double* l_out, double* d_out, int* trans_out) {
   }
 
   Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::LDLT<RowMajorMatrix> ldltDecomp(A);
   if (ldltDecomp.info() != Eigen::Success) {
     return ldltDecomp.info();
@@ -345,6 +414,9 @@ int bunchKaufman(const double* a, int n, double* recon_out) {
   }
 
   Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
   Eigen::BunchKaufman<RowMajorMatrix> bk(A);
   if (bk.info() != Eigen::Success) {
     return bk.info();
@@ -370,10 +442,18 @@ int colPivQr(const double* a, int rows, int cols, double* q_out, double* r_out, 
   }
 
   Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
   Eigen::ColPivHouseholderQR<RowMajorMatrix> cpqr(A);
+  if (cpqr.info() != Eigen::Success) {
+    return cpqr.info();
+  }
 
   RowMajorMatrix Q = cpqr.householderQ();
-  RowMajorMatrix R = cpqr.matrixQR().template triangularView<Eigen::Upper>();
+  RowMajorMatrix R = RowMajorMatrix::Zero(rows, cols);
+  R.template triangularView<Eigen::Upper>() = cpqr.matrixQR().template triangularView<Eigen::Upper>();
 
   int qEntries = rows * rows;
   for (int i = 0; i < qEntries; ++i) q_out[i] = Q.data()[i];
@@ -389,11 +469,36 @@ int colPivQr(const double* a, int rows, int cols, double* q_out, double* r_out, 
   return Eigen::Success;
 }
 
+// Standalone matrix rank via ColPivHouseholderQR.
+// Preconditions:
+//   rank_out points to 1 integer.
+// Returns Success or InvalidInput.
+// Leaves rank_out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int rank(const double* a, int rows, int cols, int* rank_out) {
+  if (a == nullptr || rank_out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::ColPivHouseholderQR<RowMajorMatrix> cpqr(A);
+  if (cpqr.info() != Eigen::Success) {
+    return cpqr.info();
+  }
+
+  *rank_out = static_cast<int>(cpqr.rank());
+  return Eigen::Success;
+}
+
 // Deterministic matrix generator with prescribed singular values.
 // Ported to use explicit linear congruential PRNG so results are platform-independent.
 EMSCRIPTEN_KEEPALIVE
 int generatePrescribedSingularValues(double* out, int rows, int cols, const double* s, int s_len, unsigned int seed) {
-  int k = std::min(rows, cols);
+  int k = Eigen::numext::mini(rows, cols);
   if (out == nullptr || s == nullptr || !validDim(rows, cols) || s_len < k) {
 
     return Eigen::InvalidInput;
@@ -457,7 +562,7 @@ int bdcSvd(const double* a, int rows, int cols, double* s_out, double* u_out, do
     return bdc.info();
   }
 
-  int k = std::min(rows, cols);
+  int k = Eigen::numext::mini(rows, cols);
   const auto& s = bdc.singularValues();
   for (int i = 0; i < k; ++i) s_out[i] = s[i];
 
