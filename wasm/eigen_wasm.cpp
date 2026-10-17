@@ -129,6 +129,63 @@ int inv(const double* a, int n, double* out) {
   return Eigen::Success;
 }
 
+// Solve linear system A x = b via PartialPivLU.
+// Preconditions: A is n-by-n row-major, b is n-vector, out is caller-allocated n-vector.
+// Returns Success, NumericalIssue (if singular or non-finite solution), or InvalidInput.
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int solvePartialLU(const double* a, const double* b, int n, double* out) {
+  if (a == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!A.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::PartialPivLU<RowMajorMatrix> plu(A);
+  double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
+  if (minDiag <= 0.0 || plu.rcond() <= 0.0) {
+    return Eigen::NumericalIssue;
+  }
+  Eigen::VectorXd x = plu.solve(rhs);
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
+// Inverse of an n-by-n row-major matrix A via PartialPivLU, written to caller-allocated out buffer.
+// Returns Success, NumericalIssue (if singular or non-finite), or InvalidInput.
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int invPartialLU(const double* a, int n, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::PartialPivLU<RowMajorMatrix> plu(A);
+  double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
+  if (minDiag <= 0.0 || plu.rcond() <= 0.0) {
+    return Eigen::NumericalIssue;
+  }
+  RowMajorMatrix inverseMat = plu.inverse();
+  if (!inverseMat.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  int totalEntries = n * n;
+  for (int i = 0; i < totalEntries; ++i) {
+    out[i] = inverseMat.data()[i];
+  }
+  return Eigen::Success;
+}
+
 // Cholesky decomposition (LLT).
 // Preconditions: A is n-by-n symmetric positive-definite, out is n-by-n row-major.
 // If A is asymmetric, non-finite, or invalid dimensions/pointers, returns InvalidInput.
