@@ -176,11 +176,15 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | File | Purpose |
 |---|---|
 | `build.sh` | `em++` invocation and output paths |
-| `eigen_wasm.cpp` | `matMul3x3`, `determinant`, `solveLU`, and `inv` wrappers over `Eigen::Map` |
+| `eigen_wasm.cpp` | `matMul3x3`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `matMul`, `svd`, `symmetricEigen` |
 | `example.js` | Worked example; imported and run by the tests |
 | `test_matmul.js` | Table-driven tests over `matMul3x3` |
 | `test_determinant.js` | Value, contract and ceiling tests over `determinant` |
 | `test_lu.js` | Residual, singularity, and contract tests over `solveLU` and `inv` |
+| `test_cholesky.js` | Residual, symmetry, and positive-definiteness tests over `cholesky` |
+| `test_qr.js` | Factorization, residual, least squares, and orthogonality tests over `qr` and `solveLeastSquares` |
+| `test_svd.js` | Singular value, reconstruction, and non-finite tests over `svd` |
+| `test_eigen.js` | Analytical, eigenvector residual, and symmetry tests over `symmetricEigen` |
 
 `wasm/` is the only local addition to this fork. `Eigen/`, `test/`, `ci/` and `.gitlab-ci.yml` are frozen upstream code, so the Eigen build system does not know this directory exists and the tests here run through GitHub Actions instead of `ctest`.
 

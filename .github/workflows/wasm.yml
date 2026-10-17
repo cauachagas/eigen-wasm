@@ -47,3 +47,15 @@ jobs:
 
       - name: Test LU and inverse
         run: node wasm/test_lu.js
+
+      - name: Test Cholesky
+        run: node wasm/test_cholesky.js
+
+      - name: Test QR and least squares
+        run: node wasm/test_qr.js
+
+      - name: Test SVD
+        run: node wasm/test_svd.js
+
+      - name: Test symmetric eigensolver
+        run: node wasm/test_eigen.js
