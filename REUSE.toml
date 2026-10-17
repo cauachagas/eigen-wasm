@@ -95,6 +95,8 @@ path = [
     "RULES.md",
     ".scratch/eigen-wasm/*.md",
     ".scratch/eigen-wasm/issues/*.md",
+    ".scratch/sparse/*.md",
+    ".scratch/sparse/issues/*.md",
 ]
 SPDX-FileCopyrightText = "The Eigen Authors"
 SPDX-License-Identifier = "MPL-2.0"

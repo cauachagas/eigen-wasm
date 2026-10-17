@@ -69,6 +69,12 @@ node test/test_colpiv_qr.js
 node test/test_cod.js
 node test/test_bdc_svd.js
 node test/test_general_eigen.js
+node test/test_sparse_triplets.js
+node test/test_sparse_spmv.js
+node test/test_sparse_spmm.js
+node test/test_sparse_add.js
+node test/test_sparse_ops.js
+node test/test_sparse_validation.js
 ```
 
 
@@ -133,6 +139,15 @@ int  generatePrescribedSingularValues(double* out, int rows, int cols, const dou
 // Eigensolvers
 int  symmetricEigen(const double* a, int n, double* eigenvalues_out, double* eigenvectors_out);
 int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eivals, double* real_eivecs, double* imag_eivecs);
+
+// Sparse Matrix Operations
+int  sparseFromTriplets(int rows, int cols, int tripletCount, const int* tripletRows, const int* tripletCols, const double* tripletValues, int storageOrder, double* outValues, int* outInnerIndices, int* outOuterStarts, int* outNnz);
+int  sparseMatMulVec(int rows, int cols, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, const double* x, double* outY);
+int  sparseMatMulDense(int rowsA, int colsA, int colsB, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, const double* b, double* outC);
+int  sparseAddGetNnz(int rows, int cols, int nnzA, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int nnzB, const double* bValues, const int* bInnerIndices, const int* bOuterStarts, int storageOrder, int* outNnz);
+int  sparseAdd(int rows, int cols, int nnzA, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int nnzB, const double* bValues, const int* bInnerIndices, const int* bOuterStarts, int storageOrder, double* outValues, int* outInnerIndices, int* outOuterStarts);
+int  sparseScale(int rows, int cols, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, double alpha, double* outValues, int* outInnerIndices, int* outOuterStarts);
+int  sparseTranspose(int rows, int cols, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, double* outValues, int* outInnerIndices, int* outOuterStarts);
 ```
 
 ### Common Conventions and Contracts
@@ -197,6 +212,16 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
 
 - `symmetricEigen(a, n, eigenvalues_out, eigenvectors_out)`: Eigendecomposition of symmetric `n x n` matrix `a` via SelfAdjointEigenSolver. Eigenvalues in ascending order written to `eigenvalues_out` (`n` doubles), column eigenvectors written to `eigenvectors_out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
 - `generalEigen(a, n, real_eivals, imag_eivals, real_eivecs, imag_eivecs)`: General eigensolver for real non-symmetric `n x n` matrices via RealSchur (`EigenSolver`). Real and imaginary parts of eigenvalues written to `real_eivals` and `imag_eivals` (`n` doubles each); real and imaginary parts of eigenvectors written to `real_eivecs` and `imag_eivecs` (`n * n` doubles each in row-major). Returns `Success`, `NoConvergence`, `NumericalIssue`, or `InvalidInput`.
+
+#### Sparse Matrix Operations
+
+- `sparseFromTriplets(rows, cols, tripletCount, tripletRows, tripletCols, tripletValues, storageOrder, outValues, outInnerIndices, outOuterStarts, outNnz)`: Assembles compressed sparse matrix (storageOrder: 0 for CSC, 1 for CSR) from coordinate triplets. Duplicate coordinates are summed automatically. Non-zero count written to `outNnz` (1 int). Returns `Success` or `InvalidInput`.
+- `sparseMatMulVec(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, x, outY)`: Sparse matrix-vector product `y = A * x`. Supports CSC (0) and CSR (1). Written to `outY` (`rows` doubles). Returns `Success` or `InvalidInput`.
+- `sparseMatMulDense(rowsA, colsA, colsB, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, b, outC)`: Sparse-dense matrix-matrix product `C = A * B`. `B` (`colsA x colsB`) and `outC` (`rowsA x colsB`) are row-major dense matrices. Returns `Success` or `InvalidInput`.
+- `sparseAddGetNnz(rows, cols, nnzA, aValues, aInnerIndices, aOuterStarts, nnzB, bValues, bInnerIndices, bOuterStarts, storageOrder, outNnz)`: Query phase for two-pass sparse addition `C = A + B`. Computes exact non-zero count of result and writes to `outNnz` (1 int). Returns `Success` or `InvalidInput`.
+- `sparseAdd(rows, cols, nnzA, aValues, aInnerIndices, aOuterStarts, nnzB, bValues, bInnerIndices, bOuterStarts, storageOrder, outValues, outInnerIndices, outOuterStarts)`: Execution phase of two-pass sparse addition `C = A + B`. Writes compressed sparse representation into caller-allocated buffers sized via `sparseAddGetNnz`. Returns `Success` or `InvalidInput`.
+- `sparseScale(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, alpha, outValues, outInnerIndices, outOuterStarts)`: Sparse scalar multiplication `B = alpha * A`. Preserves sparsity pattern. Safely supports in-place aliasing (`outValues == aValues`). Returns `Success` or `InvalidInput`.
+- `sparseTranspose(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, outValues, outInnerIndices, outOuterStarts)`: Sparse matrix transposition `B = A^T`. Resulting dimensions are `cols x rows` with identical `nnz`. Returns `Success` or `InvalidInput`.
 
 ### Dimension ceiling: 2048
 

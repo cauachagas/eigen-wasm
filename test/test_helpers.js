@@ -31,6 +31,12 @@ export function createTester(Module) {
     return ptr;
   }
 
+  function allocInts(values) {
+    const ptr = Module._malloc(values.length * 4);
+    for (let i = 0; i < values.length; i++) Module.setValue(ptr + i * 4, values[i], 'i32');
+    return ptr;
+  }
+
   function readDoubles(ptr, count) {
     const arr = [];
     for (let i = 0; i < count; i++) arr.push(Module.getValue(ptr + i * 8, 'double'));
@@ -56,6 +62,7 @@ export function createTester(Module) {
   return {
     report,
     alloc,
+    allocInts,
     readDoubles,
     readInts,
     norm,

@@ -114,3 +114,27 @@ LU or Cholesky.
 **ALLOW_MEMORY_GROWTH**: Emscripten flag permitting the heap to grow at runtime. It detaches typed-array
 views of the heap when it does, which is why memory is read and written with `setValue` and `getValue`
 rather than through a retained `HEAPF64` view.
+
+## Sparse module
+
+**Sparse routine**: One exported function computing an operation on or between sparse matrices, accepting
+compressed storage buffers or coordinate triplets and writing results into caller-provided buffers.
+
+**Compressed Sparse Column (CSC)**: Standard 3-buffer sparse representation (`values`, `innerIndices`,
+`outerStarts`) where values and row indices are contiguous per column. Default storage format in Eigen.
+
+**Compressed Sparse Row (CSR)**: 3-buffer sparse representation (`values`, `innerIndices`, `outerStarts`)
+where values and column indices are contiguous per row.
+
+**Triplet (COO)**: Coordinate list format represented as three parallel arrays (`rowIndices`, `colIndices`,
+`values`) used as the standard entry point for matrix assembly before compression.
+
+**SpMV**: Sparse Matrix-Vector multiplication (`y = A * x`), evaluating a sparse matrix multiplied by a dense
+vector into a dense output vector.
+
+**SpMM**: Sparse Matrix-Matrix multiplication, covering both sparse-dense product (`C = A * B` with B and C dense)
+and sparse-sparse product (`C = A * B`).
+
+**Two-pass sparse allocation**: Pattern where a query function first computes the exact non-zero count
+(`outNnz`) of a variable-sized sparse result, enabling the caller to allocate buffers of exact size via
+`Module._malloc` before executing the computation.

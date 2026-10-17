@@ -3,6 +3,7 @@
 
 #include <emscripten.h>
 #include "Eigen/Dense"
+#include "sparse_wasm.hpp"
 
 // The dimension ceiling for the WebAssembly target.
 // With STACK_SIZE=16MB and dynamic memory growth, routines scale up to 2048x2048 cleanly.
