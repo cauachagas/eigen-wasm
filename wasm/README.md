@@ -108,5 +108,6 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | `eigen_wasm.cpp` | `matMul3x3` wrapper over `Eigen::Map` |
 | `test_matmul.js` | Table-driven tests over the exported function |
 
-`build.sh` honours `EMCC`, `SRC` and `OUT` from the environment; unset, it compiles
-`eigen_wasm.cpp` to `eigen_wasm.js` beside itself.
+`build.sh` honours `SRC` and `OUT` from the environment; unset, it compiles
+`eigen_wasm.cpp` to `eigen_wasm.js` beside itself. The compiler is not
+configurable: it is always `em++`.
