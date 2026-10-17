@@ -16,19 +16,17 @@ set -euo pipefail
 # CI does not use that path: .github/workflows/wasm.yml runs emscripten/emsdk
 # from the emsdk Docker image, where em++ is already on PATH.
 #
-# em++ not emcc: emcc links no C++ runtime. The 3x3 product touches no
-# libstdc++ symbol and slips through, but any Eigen decomposition (LU, QR,
-# SVD, ...) needs __cxa_allocate_exception and std::bad_alloc, and fails to
-# link with "undefined symbol". em++ links libstdc++ automatically.
+# The compiler is not configurable. em++ links libstdc++; emcc does not, so the
+# 3x3 product compiles under emcc but any Eigen decomposition (LU, QR, SVD, ...)
+# fails to link on __cxa_allocate_exception. Only SRC and OUT are overridable.
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)   # Eigen/ lives at the repository root
 
-EMCC=${EMCC:-em++}
 SRC=${SRC:-$HERE/eigen_wasm.cpp}
 OUT=${OUT:-$HERE/eigen_wasm.js}
 
-$EMCC "$SRC" -o "$OUT" \
+em++ "$SRC" -o "$OUT" \
   -I"$ROOT" \
   -O3 \
   -s ALLOW_MEMORY_GROWTH=1 \

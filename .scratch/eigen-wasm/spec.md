@@ -4,7 +4,7 @@ Objective: Reproduce an Eigen build in WebAssembly with Core+Dense.
 
 ## Build
 
-`wasm/build.sh` invoking emcc:
+`wasm/build.sh` invoking em++:
 
 | Flag | Value | Why |
 |---|---|---|
@@ -20,10 +20,10 @@ Objective: Reproduce an Eigen build in WebAssembly with Core+Dense.
 
 ## Build script contract
 
-`build.sh` honours `EMCC`, `SRC` and `OUT` from the environment. Unset, it compiles
-`eigen_wasm.cpp` to `eigen_wasm.js` beside itself. It must invoke `em++`, not `emcc`:
-`emcc` links no C++ runtime, so the 3x3 product compiles but any Eigen decomposition
-fails to link on `__cxa_allocate_exception`.
+`build.sh` honours `SRC` and `OUT` from the environment. Unset, it compiles
+`eigen_wasm.cpp` to `eigen_wasm.js` beside itself. The compiler is not configurable:
+it is always `em++`, never `emcc`. `emcc` links no C++ runtime, so the 3x3 product
+compiles but any Eigen decomposition fails to link on `__cxa_allocate_exception`.
 
 ## Deliverables
 
