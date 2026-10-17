@@ -35,6 +35,58 @@ static inline bool isSymmetric(const double* a, int n) {
   return true;
 }
 
+enum MatrixNormType {
+  NormFrobenius = 0,
+  NormOne = 1,
+  NormInfinity = 2
+};
+
+static inline bool isPartialPivLUInvertible(const Eigen::PartialPivLU<RowMajorMatrix>& plu) {
+  double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
+  double maxDiag = plu.matrixLU().diagonal().cwiseAbs().maxCoeff();
+  if (maxDiag <= 0.0 || minDiag <= 0.0) {
+    return false;
+  }
+  if ((minDiag / maxDiag) <= 1e-12 || plu.rcond() <= 1e-12) {
+    return false;
+  }
+  return true;
+}
+
+template <unsigned int Mode>
+static inline int solveTriangularImpl(const double* a, const double* b, int n, int unit_diag, double* out) {
+  if (a == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!A.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  if (unit_diag == 0) {
+    if (A.diagonal().cwiseAbs().minCoeff() == 0.0) {
+      return Eigen::NumericalIssue;
+    }
+  }
+
+  Eigen::VectorXd x(n);
+  if (unit_diag != 0) {
+    constexpr unsigned int UnitMode = (Mode == Eigen::Lower) ? Eigen::UnitLower : Eigen::UnitUpper;
+    x = A.template triangularView<UnitMode>().solve(rhs);
+  } else {
+    x = A.template triangularView<Mode>().solve(rhs);
+  }
+
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
 extern "C" {
 
 // Expose the target dimension ceiling so tests and callers can read it rather than duplicating it.
@@ -106,7 +158,7 @@ int trace(const double* a, int n, double* out) {
   return Eigen::Success;
 }
 
-// Matrix norms:
+
 // norm_type = 0: Frobenius norm
 // norm_type = 1: 1-norm (maximum absolute column sum)
 // norm_type = 2: Infinity-norm (maximum absolute row sum)
@@ -115,7 +167,7 @@ int matrixNorm(const double* a, int rows, int cols, int norm_type, double* out) 
   if (a == nullptr || out == nullptr || !validDim(rows, cols)) {
     return Eigen::InvalidInput;
   }
-  if (norm_type < 0 || norm_type > 2) {
+  if (norm_type < NormFrobenius || norm_type > NormInfinity) {
     return Eigen::InvalidInput;
   }
   Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
@@ -123,11 +175,11 @@ int matrixNorm(const double* a, int rows, int cols, int norm_type, double* out) 
     return Eigen::InvalidInput;
   }
 
-  if (norm_type == 0) {
+  if (norm_type == NormFrobenius) {
     *out = A.norm();
-  } else if (norm_type == 1) {
+  } else if (norm_type == NormOne) {
     *out = A.cwiseAbs().colwise().sum().maxCoeff();
-  } else if (norm_type == 2) {
+  } else if (norm_type == NormInfinity) {
     *out = A.cwiseAbs().rowwise().sum().maxCoeff();
   }
 
@@ -218,6 +270,7 @@ int inv(const double* a, int n, double* out) {
   return Eigen::Success;
 }
 
+
 // Solve linear system A x = b via PartialPivLU.
 // Preconditions: A is n-by-n row-major, b is n-vector, out is caller-allocated n-vector.
 // Returns Success, NumericalIssue (if singular or non-finite solution), or InvalidInput.
@@ -233,8 +286,7 @@ int solvePartialLU(const double* a, const double* b, int n, double* out) {
     return Eigen::InvalidInput;
   }
   Eigen::PartialPivLU<RowMajorMatrix> plu(A);
-  double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
-  if (minDiag <= 0.0 || plu.rcond() <= 0.0) {
+  if (!isPartialPivLUInvertible(plu)) {
     return Eigen::NumericalIssue;
   }
   Eigen::VectorXd x = plu.solve(rhs);
@@ -260,8 +312,7 @@ int invPartialLU(const double* a, int n, double* out) {
     return Eigen::InvalidInput;
   }
   Eigen::PartialPivLU<RowMajorMatrix> plu(A);
-  double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
-  if (minDiag <= 0.0 || plu.rcond() <= 0.0) {
+  if (!isPartialPivLUInvertible(plu)) {
     return Eigen::NumericalIssue;
   }
   RowMajorMatrix inverseMat = plu.inverse();
@@ -338,74 +389,19 @@ int solveCholesky(const double* a, const double* b, int n, double* out) {
   return Eigen::Success;
 }
 
+
 // Solve lower triangular system L x = b.
 // unit_diag != 0 implies unit lower triangular (diagonal entries assumed to be 1.0).
 EMSCRIPTEN_KEEPALIVE
 int solveTriangularLower(const double* l, const double* b, int n, int unit_diag, double* out) {
-  if (l == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
-    return Eigen::InvalidInput;
-  }
-  Eigen::Map<const RowMajorMatrix> L(l, n, n);
-  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
-  if (!L.allFinite() || !rhs.allFinite()) {
-    return Eigen::InvalidInput;
-  }
-
-  if (unit_diag == 0) {
-    if (L.diagonal().cwiseAbs().minCoeff() == 0.0) {
-      return Eigen::NumericalIssue;
-    }
-  }
-
-  Eigen::VectorXd x(n);
-  if (unit_diag != 0) {
-    x = L.template triangularView<Eigen::UnitLower>().solve(rhs);
-  } else {
-    x = L.template triangularView<Eigen::Lower>().solve(rhs);
-  }
-
-  if (!x.allFinite()) {
-    return Eigen::NumericalIssue;
-  }
-  for (int i = 0; i < n; ++i) {
-    out[i] = x[i];
-  }
-  return Eigen::Success;
+  return solveTriangularImpl<Eigen::Lower>(l, b, n, unit_diag, out);
 }
 
 // Solve upper triangular system U x = b.
 // unit_diag != 0 implies unit upper triangular (diagonal entries assumed to be 1.0).
 EMSCRIPTEN_KEEPALIVE
 int solveTriangularUpper(const double* u, const double* b, int n, int unit_diag, double* out) {
-  if (u == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
-    return Eigen::InvalidInput;
-  }
-  Eigen::Map<const RowMajorMatrix> U(u, n, n);
-  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
-  if (!U.allFinite() || !rhs.allFinite()) {
-    return Eigen::InvalidInput;
-  }
-
-  if (unit_diag == 0) {
-    if (U.diagonal().cwiseAbs().minCoeff() == 0.0) {
-      return Eigen::NumericalIssue;
-    }
-  }
-
-  Eigen::VectorXd x(n);
-  if (unit_diag != 0) {
-    x = U.template triangularView<Eigen::UnitUpper>().solve(rhs);
-  } else {
-    x = U.template triangularView<Eigen::Upper>().solve(rhs);
-  }
-
-  if (!x.allFinite()) {
-    return Eigen::NumericalIssue;
-  }
-  for (int i = 0; i < n; ++i) {
-    out[i] = x[i];
-  }
-  return Eigen::Success;
+  return solveTriangularImpl<Eigen::Upper>(u, b, n, unit_diag, out);
 }
 
 

@@ -178,6 +178,29 @@ testInvPartialLU('invPartialLU 4x4', A4, 4);
   Module._free(bPtr);
   Module._free(outPtr);
   Module._free(invPtr);
+
+  // 3x3 singular matrix with dependent rows
+  const singular3x3 = [
+    1, 2, 3,
+    4, 5, 6,
+    7, 8, 9
+  ];
+  let a3Ptr = alloc(singular3x3);
+  let b3Ptr = alloc([1, 2, 3]);
+  let out3Ptr = alloc([SENTINEL, SENTINEL, SENTINEL]);
+  const solve3Status = solvePartialLU(a3Ptr, b3Ptr, 3, out3Ptr);
+  report('solvePartialLU rejects 3x3 singular matrix with NUMERICAL_ISSUE', solve3Status, NUMERICAL_ISSUE);
+  report('solvePartialLU preserves output buffer on 3x3 singular failure', readDoubles(out3Ptr, 3), [SENTINEL, SENTINEL, SENTINEL]);
+
+  let inv3Ptr = alloc(new Array(9).fill(SENTINEL));
+  const inv3Status = invPartialLU(a3Ptr, 3, inv3Ptr);
+  report('invPartialLU rejects 3x3 singular matrix with NUMERICAL_ISSUE', inv3Status, NUMERICAL_ISSUE);
+  report('invPartialLU preserves output buffer on 3x3 singular failure', readDoubles(inv3Ptr, 9), new Array(9).fill(SENTINEL));
+
+  Module._free(a3Ptr);
+  Module._free(b3Ptr);
+  Module._free(out3Ptr);
+  Module._free(inv3Ptr);
 }
 
 // Dimension bounds checks (<=0 or > 2048) and null pointers
