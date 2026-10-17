@@ -198,9 +198,43 @@ testSolveTriangularUpper('solveTriangularUpper 2x2 unit', [999, 2, 0, 999], [7, 
   report('solveTriangularLower rejects singular diagonal with NUMERICAL_ISSUE', status, NUMERICAL_ISSUE);
   report('solveTriangularLower preserves output buffer on singular failure', readDoubles(xPtr, 2), [SENTINEL, SENTINEL]);
 
+  // Near-zero diagonal (1e-16) must also be detected as singular
+  let lNearZeroPtr = alloc([1.0, 0.0, 0.5, 1e-16]);
+  let xNearZeroPtr = alloc([SENTINEL, SENTINEL]);
+  const nearZeroStatus = solveTriangularLower(lNearZeroPtr, bPtr, 2, 0, xNearZeroPtr);
+  report('solveTriangularLower rejects near-zero diagonal with NUMERICAL_ISSUE', nearZeroStatus, NUMERICAL_ISSUE);
+  report('solveTriangularLower preserves output buffer on near-zero diagonal failure', readDoubles(xNearZeroPtr, 2), [SENTINEL, SENTINEL]);
+
   Module._free(lPtr);
+  Module._free(lNearZeroPtr);
   Module._free(bPtr);
   Module._free(xPtr);
+  Module._free(xNearZeroPtr);
+}
+
+// Non-triangular matrix input -> INVALID_INPUT
+{
+  // Upper triangular matrix passed to solveTriangularLower
+  let nonLowerPtr = alloc([1, 2, 0, 1]);
+  let bPtr = alloc([1, 1]);
+  let xPtr = alloc([SENTINEL, SENTINEL]);
+
+  const lowerStatus = solveTriangularLower(nonLowerPtr, bPtr, 2, 0, xPtr);
+  report('solveTriangularLower rejects non-lower matrix with INVALID_INPUT', lowerStatus, INVALID_INPUT);
+  report('solveTriangularLower preserves output buffer on non-lower input', readDoubles(xPtr, 2), [SENTINEL, SENTINEL]);
+
+  // Lower triangular matrix passed to solveTriangularUpper
+  let nonUpperPtr = alloc([1, 0, 2, 1]);
+  let xUpperPtr = alloc([SENTINEL, SENTINEL]);
+  const upperStatus = solveTriangularUpper(nonUpperPtr, bPtr, 2, 0, xUpperPtr);
+  report('solveTriangularUpper rejects non-upper matrix with INVALID_INPUT', upperStatus, INVALID_INPUT);
+  report('solveTriangularUpper preserves output buffer on non-upper input', readDoubles(xUpperPtr, 2), [SENTINEL, SENTINEL]);
+
+  Module._free(nonLowerPtr);
+  Module._free(nonUpperPtr);
+  Module._free(bPtr);
+  Module._free(xPtr);
+  Module._free(xUpperPtr);
 }
 
 // Dimension bounds checks (<=0 or > 2048) and null pointers

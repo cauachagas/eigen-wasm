@@ -201,6 +201,17 @@ testInvPartialLU('invPartialLU 4x4', A4, 4);
   Module._free(b3Ptr);
   Module._free(out3Ptr);
   Module._free(inv3Ptr);
+
+  // Well-scaled matrix with small diagonal (1e-13) that is fully invertible
+  const illCondButInvertible = [1.0, 0.0, 0.0, 1e-13];
+  let aWellPtr = alloc(illCondButInvertible);
+  let invWellPtr = alloc(new Array(4).fill(SENTINEL));
+  const wellStatus = invPartialLU(aWellPtr, 2, invWellPtr);
+  report('invPartialLU accepts well-scaled invertible matrix with small diagonal', wellStatus, SUCCESS);
+  const wellInv = readDoubles(invWellPtr, 4);
+  report('invPartialLU inverse matches for small diagonal', Math.abs(wellInv[3] - 1e13) / 1e13 < 1e-10, true);
+  Module._free(aWellPtr);
+  Module._free(invWellPtr);
 }
 
 // Dimension bounds checks (<=0 or > 2048) and null pointers
