@@ -44,13 +44,35 @@ Cannot fail the way a factorization can.
 `NumericalIssue`, `NoConvergence`, `InvalidInput`. The WASM surface exposes this enum rather than
 inventing its own, so a failure a caller can see is the failure the Eigen test suite already asserts on.
 
-**InvalidInput**: The `ComputationInfo` value meaning the input was rejected before any attempt was
-made, as distinct from an attempt that failed. Reported by the SVD routines for non-finite input.
-
 **matMul3x3**: Exported function computing `out = a * b` for row-major 3x3 matrices passed as three
 `double` pointers.
 
+**determinant**: Exported function computing the determinant of a row-major `rows`-by-`cols` matrix
+into a caller-allocated `double`, taking the dimensions as parameters and returning `int` carrying
+`ComputationInfo` verbatim. Rejects a null pointer, a zero or negative dimension, a non-square
+matrix, and a dimension above 255. A singular matrix is a determinant of zero, not a failure, so it
+reports `Success`.
+
+**Success**: The `ComputationInfo` value meaning the computation ran and its output buffer holds the
+result. Value `0`, and the value the WASM surface returns unchanged as a routine's `int` return.
+
+**NumericalIssue**: The `ComputationInfo` value meaning the computation ran but the result is not
+trustworthy. Value `1`. Reported by Cholesky for a matrix that is not positive definite.
+
+**NoConvergence**: The `ComputationInfo` value meaning an iterative computation exhausted its budget.
+Value `2`.
+
+**InvalidInput**: The `ComputationInfo` value meaning the input was rejected before any attempt was
+made, as distinct from an attempt that failed. Value `3`. Reported by the SVD routines for non-finite
+input, and by every WASM dense routine whose own precondition checks reject a call. A routine that
+returns it wrote to no output buffer.
+
 **Row-major**: Memory layout where element (i, j) lives at index `rows * i + j`.
+
+**Dimension ceiling**: The largest matrix dimension a WASM dense routine accepts, currently 255. Below
+the Eigen test suite's 320, because at 256 and above the blocked LU behind `MatrixBase::determinant()`
+enters a nested panel update that reads out of bounds and traps the module. Guarding it turns the
+trap into `InvalidInput`.
 
 ## Verification
 
