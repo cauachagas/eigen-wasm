@@ -45,7 +45,9 @@ em++ "$SRC" -o "$OUT" \
   -I"$ROOT" \
   -O3 \
   -s ALLOW_MEMORY_GROWTH=1 \
-  -s STACK_SIZE=4MB \
+  -s STACK_SIZE=16MB \
+  -s INITIAL_MEMORY=128MB \
+  -s MAXIMUM_MEMORY=4GB \
   -s EXPORT_ES6=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="EigenWasmModule" \

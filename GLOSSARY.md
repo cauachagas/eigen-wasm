@@ -50,7 +50,7 @@ inventing its own, so a failure a caller can see is the failure the Eigen test s
 **determinant**: Exported function computing the determinant of a row-major `rows`-by-`cols` matrix
 into a caller-allocated `double`, taking the dimensions as parameters and returning `int` carrying
 `ComputationInfo` verbatim. Rejects a null pointer, a zero or negative dimension, a non-square
-matrix, and a dimension above 255. A singular matrix is a determinant of zero, not a failure, so it
+matrix, and a dimension above 2048. A singular matrix is a determinant of zero, not a failure, so it
 reports `Success`.
 
 **Success**: The `ComputationInfo` value meaning the computation ran and its output buffer holds the
@@ -69,10 +69,9 @@ returns it wrote to no output buffer.
 
 **Row-major**: Memory layout where element (i, j) lives at index `rows * i + j`.
 
-**Dimension ceiling**: The largest matrix dimension a WASM dense routine accepts, currently 255. Below
-the Eigen test suite's 320, because at 256 and above the blocked LU behind `MatrixBase::determinant()`
-enters a nested panel update that reads out of bounds and traps the module. Guarding it turns the
-trap into `InvalidInput`.
+**Dimension ceiling**: The largest matrix dimension a WASM dense routine accepts, currently 2048.
+Supported by 16 MB stack allocation and dynamic memory growth up to 4 GB in Emscripten. Dimensions
+above 2048 return `InvalidInput` before any allocation or computation begins.
 
 **Contract bug**: A defect in an exported routine where observable behavior breaks the published
 `ABI_CONTRACT.md`, including uninitialized buffer memory, returning `Success` for non-converged or

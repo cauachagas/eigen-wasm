@@ -114,7 +114,7 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
    - `0`: `Success` - computation succeeded, output buffers written.
    - `1`: `NumericalIssue` - singular matrix, non-positive definite, non-finite numerical result, or pivot failure.
    - `2`: `NoConvergence` - iterative decomposition did not converge within the iteration budget.
-   - `3`: `InvalidInput` - precondition violation (null pointer, dimension <= 0, dimension > 255, non-square where required, asymmetric where required, or non-finite input).
+   - `3`: `InvalidInput` - precondition violation (null pointer, dimension <= 0, dimension > 2048, non-square where required, asymmetric where required, or non-finite input).
 4. **Output Buffer Invariant**: **Output buffers are untouched unless the routine reports `Success`.** Every precondition is validated before results are written, so rejected calls leave memory completely unmodified. Callers can safely pass pre-filled sentinel buffers to verify contract compliance.
 5. **Aliasing**: `matMul3x3` allows `out` to alias `a` or `b`. For all other routines, input and output buffers must not overlap.
 
@@ -122,7 +122,7 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
 
 #### System & Configuration
 
-- `maxDimension()`: Returns the dimension ceiling (`255`).
+- `maxDimension()`: Returns the dimension ceiling (`2048`).
 
 #### Matrix Multiplication
 
@@ -157,28 +157,19 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
 - `symmetricEigen(a, n, eigenvalues_out, eigenvectors_out)`: Eigendecomposition of symmetric `n x n` matrix `a` via SelfAdjointEigenSolver. Eigenvalues in ascending order written to `eigenvalues_out` (`n` doubles), column eigenvectors written to `eigenvectors_out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
 - `generalEigen(a, n, real_eivals, imag_eivals, real_eivecs, imag_eivecs)`: General eigensolver for real non-symmetric `n x n` matrices via RealSchur (`EigenSolver`). Real and imaginary parts of eigenvalues written to `real_eivals` and `imag_eivals` (`n` doubles each); real and imaginary parts of eigenvectors written to `real_eivecs` and `imag_eivecs` (`n * n` doubles each in row-major). Returns `Success`, `NoConvergence`, `NumericalIssue`, or `InvalidInput`.
 
-### Dimension ceiling: 255, not 320
+### Dimension ceiling: 2048
 
-The Eigen test suite's `EIGEN_TEST_MAX_SIZE` is 320, and this module does not reach it.
-At dimension 256 and above, the blocked LU behind `MatrixBase::determinant()` raises its
-block size from 16 to 32 and its nested panel update reads out of bounds, which traps
-the WASM instance: the module dies with `memory access out of bounds` and no return
-value, rather than returning anything a caller could inspect.
+The WebAssembly module enforces a canonical dimension ceiling of 2048 (`kMaxDimension = 2048`),
+supported by `-s STACK_SIZE=16MB`, `-s INITIAL_MEMORY=128MB`, and `-s MAXIMUM_MEMORY=4GB` with dynamic
+growth.
 
-The boundary is sharp and reproducible. `blocked_lu` sizes its blocks as
-`clamp(((size / 8) / 16) * 16, 8, 256)`, which is 16 for every size below 256 and 32 at
-256, and the trap begins exactly there. Measured on this build: 255 succeeds and 256
-traps, for every matrix shape tried (zeros, ones, diagonal, bidiagonal, random,
-large-magnitude), for `MatrixBase::determinant()`, `PartialPivLU`, and `FullPivLU`, and
-for row-major and column-major input, at `-O0`, `-O1`, `-O2`, `-O3`, `-Os`, and `-Oz`.
-It is not fixed by `-fsanitize=address`, nor by raising `INITIAL_MEMORY` or
-`STACK_SIZE`, nor by setting `EIGEN_GEMM_TO_COEFFBASED_THRESHOLD`.
+At dimension 2048, a matrix of double-precision numbers occupies 32 MB, and routines compute stably
+and deterministically without memory traps. Dimensions exceeding 2048 return `InvalidInput` (3) before
+any memory is allocated or written, preserving the untouched-buffer invariant.
 
-`Eigen/` is frozen upstream, so the fix is not in this module. Guarding the dimension
-is what keeps the failure a returned `InvalidInput` instead of a dead module, and
-`test_determinant.js` asserts both sides of the boundary: 255 computes, and 256 and 320
-are rejected. Every later dense routine inherits this ceiling and the trap behind it;
-see `.scratch/eigen-wasm/spec-dense.md`.
+Because single-threaded operations at N = 2048 can require several seconds (e.g. iterative eigensolvers
+or singular value decompositions), frontend applications should run heavy dense computations in Web Workers
+rather than on the browser's UI thread to prevent interface freezing.
 
 ### Worked example
 

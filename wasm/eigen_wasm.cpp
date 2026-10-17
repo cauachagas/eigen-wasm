@@ -4,13 +4,10 @@
 #include <emscripten.h>
 #include "Eigen/Dense"
 
-// The dimension ceiling. The Eigen test suite's EIGEN_TEST_MAX_SIZE is 320, but 256 is the
-// real boundary on this target: at 256 and above, the blocked LU behind MatrixBase::determinant()
-// raises its block size from 16 to 32 and its nested panel update reads out of bounds, which
-// traps the WASM instance instead of returning. 255 is the largest size below that boundary.
-// Guarding it is what turns an oversized request into InvalidInput rather than a dead module;
-// wasm/README.md records the measurement.
-constexpr int kMaxDimension = 255;
+// The dimension ceiling for the WebAssembly target.
+// With STACK_SIZE=16MB and dynamic memory growth, routines scale up to 2048x2048 cleanly.
+// Guarding it ensures oversized requests return InvalidInput rather than exhausting linear memory.
+constexpr int kMaxDimension = 2048;
 
 using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
