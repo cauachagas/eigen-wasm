@@ -5,11 +5,14 @@ WebAssembly build of Eigen's Core and Dense modules, compiled with Emscripten.
 ## Requirements
 
 An activated emsdk. It bundles its own Python and Node, so no separate install is
-needed.
+needed. If installed locally at `/tmp/emsdk`:
 
 ```bash
-source /path/to/emsdk/emsdk_env.sh
+source /tmp/emsdk/emsdk_env.sh
 ```
+
+`build.sh` will also attempt to auto-source `/tmp/emsdk/emsdk_env.sh` if `em++` is not
+found on `$PATH`.
 
 ## Build
 
@@ -34,7 +37,23 @@ to touch no libstdc++ symbol, but any Eigen decomposition needs
 ```bash
 node wasm/test_matmul.js
 node wasm/test_determinant.js
+node wasm/test_lu.js
+node wasm/test_cholesky.js
+node wasm/test_qr.js
+node wasm/test_svd.js
+node wasm/test_eigen.js
+node wasm/test_ldlt.js
+node wasm/test_colpiv_qr.js
+node wasm/test_bdc_svd.js
+node wasm/test_general_eigen.js
 ```
+
+Or run all test suites in one go:
+
+```bash
+for f in wasm/test_*.js; do node "$f"; done
+```
+
 
 Each exits 0 when every case passes and non-zero if any case fails, so each is usable
 as a CI gate. A failing case does not stop the run: the suite reports every mismatch,
