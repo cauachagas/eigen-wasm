@@ -33,6 +33,8 @@ path = [
     ".gitignore",
     ".github/workflows/wasm.yml",
     ".gitlab/**",
+    "GLOSSARY.md",
+    "docs/agents/*.md",
 ]
 SPDX-FileCopyrightText = "The Eigen Authors"
 SPDX-License-Identifier = "MPL-2.0"

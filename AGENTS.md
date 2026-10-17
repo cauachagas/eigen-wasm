@@ -124,7 +124,7 @@ includes. The upstream project is on GitLab at `gitlab.com/libeigen/eigen`, whic
 
 This repository is the `cauachagas/eigen-wasm` fork on GitHub, and it is where changes are made.
 
-`Eigen/`, `contrib/Eigen/`, `unsupported/Eigen/`, `test/`, `ci/`, and `.gitlab-ci.yml` are frozen upstream code. Do not edit them.
+`Eigen/`, `contrib/Eigen/`, `unsupported/Eigen/`, and `test/` hold programming code from upstream, and that code is frozen. Do not edit it. Accessory files belong to this fork and may be edited, including `AGENTS.md`, the guides under `.agents/`, `REUSE.toml`, `RULES.md`, `.gitignore`, and anything under `docs/`. Where a fork edit disagrees with upstream, the fork's version wins.
 
 The supported implementation is under `Eigen/src/`; tests are under `test/`. Modules with looser API-stability
 guarantees are under `contrib/Eigen/`, with tests under `contrib/test/`. Legacy `unsupported/Eigen/...` include paths
@@ -245,3 +245,21 @@ Before declaring the task complete:
 
 Prefer commit subjects of the form `Category: Short description`, for example
 `Core: Fix alias handling in product assignment`.
+
+## Agent skills
+
+### Issue tracker
+
+Specs and tickets live as markdown under `.scratch/<feature>/`, never on GitHub or GitLab. See
+[`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md).
+
+### Triage labels
+
+The five canonical roles, recorded as a `Status:` line in each ticket file. See
+[`docs/agents/triage-labels.md`](docs/agents/triage-labels.md).
+
+### Domain docs
+
+Single-context. [`GLOSSARY.md`](GLOSSARY.md) at the root describes the WebAssembly build under `wasm/`;
+the frozen Eigen sources keep their own upstream vocabulary. See
+[`docs/agents/domain.md`](docs/agents/domain.md).
