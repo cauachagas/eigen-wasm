@@ -197,10 +197,10 @@ function testInv(name, A_vals, n, expectedInv) {
 testInv('inv 1x1', [4], 1, [0.25]);
 
 // 2x2:
-// [4, 7]^-1 = [0.6, -1.4]
-// [2, 6]      [-0.2, 0.8]
+// [4, 7]^-1 = [ 0.6, -0.7]
+// [2, 6]      [-0.2,  0.4]
 // det = 24 - 14 = 10
-testInv('inv 2x2', [4, 7, 2, 6], 2, [0.6, -1.4, -0.2, 0.8]);
+testInv('inv 2x2', [4, 7, 2, 6], 2, [0.6, -0.7, -0.2, 0.4]);
 
 // --- 3. Test singular matrices: must return NumericalIssue and leave output untouched ---
 

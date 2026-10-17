@@ -23,8 +23,23 @@ set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$HERE/.." && pwd)   # Eigen/ lives at the repository root
 
+# Auto-activate emsdk if em++ is not on PATH and /tmp/emsdk exists
+if ! command -v em++ >/dev/null 2>&1; then
+  if [ -f "/tmp/emsdk/emsdk_env.sh" ]; then
+    echo "em++ not found in PATH; activating /tmp/emsdk/emsdk_env.sh..."
+    # shellcheck source=/dev/null
+    source /tmp/emsdk/emsdk_env.sh >/dev/null
+  else
+    echo "Error: em++ not found in PATH." >&2
+    echo "Please activate emsdk first:" >&2
+    echo "  source /path/to/emsdk/emsdk_env.sh (e.g. source /tmp/emsdk/emsdk_env.sh)" >&2
+    exit 1
+  fi
+fi
+
 SRC=${SRC:-$HERE/eigen_wasm.cpp}
 OUT=${OUT:-$HERE/eigen_wasm.js}
+
 
 em++ "$SRC" -o "$OUT" \
   -I"$ROOT" \
@@ -33,7 +48,7 @@ em++ "$SRC" -o "$OUT" \
   -s EXPORT_ES6=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="EigenWasmModule" \
-  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_solveLU","_inv","_cholesky","_qr","_solveLeastSquares","_matMul","_svd","_symmetricEigen","_ldlt","_colPivQr","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_solveLU","_inv","_cholesky","_qr","_solveLeastSquares","_matMul","_svd","_symmetricEigen","_ldlt","_bunchKaufman","_colPivQr","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","setValue","getValue"]' \
   -std=c++17
 

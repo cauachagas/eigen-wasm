@@ -287,10 +287,13 @@ int symmetricEigen(const double* a, int n, double* eigenvalues_out, double* eige
 }
 
 // LDLT factorization for symmetric matrices (positive semidefinite and indefinite).
-// Preconditions: A is n-by-n symmetric, l_out is n-by-n row-major, d_out is n-vector.
+// LDLT decomposition for positive semi-definite matrices.
+// Preconditions: A is n-by-n symmetric, l_out is n-by-n row-major, d_out is n-vector,
+//                trans_out is n integers representing the transpositions sequence P.
 EMSCRIPTEN_KEEPALIVE
-int ldlt(const double* a, int n, double* l_out, double* d_out) {
-  if (a == nullptr || l_out == nullptr || d_out == nullptr || n < 1 || n > kMaxDimension) {
+int ldlt(const double* a, int n, double* l_out, double* d_out, int* trans_out) {
+  if (a == nullptr || l_out == nullptr || d_out == nullptr || trans_out == nullptr ||
+      n < 1 || n > kMaxDimension) {
     return Eigen::InvalidInput;
   }
 
@@ -322,8 +325,48 @@ int ldlt(const double* a, int n, double* l_out, double* d_out) {
     d_out[i] = D[i];
   }
 
+  const auto& trans = ldltDecomp.transpositionsP();
+  for (int i = 0; i < n; ++i) {
+    trans_out[i] = static_cast<int>(trans.indices()[i]);
+  }
+
   return Eigen::Success;
 }
+
+// Bunch-Kaufman decomposition for symmetric indefinite matrices.
+// Preconditions: A is n-by-n symmetric, recon_out is n-by-n row-major for reconstructed matrix.
+EMSCRIPTEN_KEEPALIVE
+int bunchKaufman(const double* a, int n, double* recon_out) {
+  if (a == nullptr || recon_out == nullptr || n < 1 || n > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  // Symmetry check
+  for (int i = 0; i < n; ++i) {
+    for (int j = i + 1; j < n; ++j) {
+      double diff = std::abs(a[i * n + j] - a[j * n + i]);
+      double mag = std::min(std::abs(a[i * n + j]), std::abs(a[j * n + i]));
+      if (diff > 1e-12 && diff > mag * 1e-6) {
+        return Eigen::InvalidInput;
+      }
+    }
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::BunchKaufman<RowMajorMatrix> bk(A);
+  if (bk.info() != Eigen::Success) {
+    return bk.info();
+  }
+
+  RowMajorMatrix recon = bk.reconstructedMatrix();
+  int total = n * n;
+  for (int i = 0; i < total; ++i) {
+    recon_out[i] = recon.data()[i];
+  }
+
+  return Eigen::Success;
+}
+
 
 // ColPivHouseholderQR: column-pivoted QR with rank and column permutation.
 // Preconditions: A is rows x cols row-major.
