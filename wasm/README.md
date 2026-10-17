@@ -24,15 +24,26 @@ it can be run from anywhere.
 `build.sh` compiles with `-std=c++17` because Emscripten requires it. Eigen itself
 is C++14 and needs no newer standard here.
 
+It invokes `em++`, not `emcc`. `emcc` links no C++ runtime: the 3x3 product happens
+to touch no libstdc++ symbol, but any Eigen decomposition needs
+`__cxa_allocate_exception` and `std::bad_alloc` and fails to link with
+`undefined symbol`.
+
 ## Test
 
 ```bash
 node wasm/test_matmul.js
 ```
 
-Exits 0 when every case passes and non-zero on the first mismatch, so it is usable
-as a CI gate. Expected results are hand-computed literals rather than values
-recomputed by the code under test.
+Exits 0 when every case passes and non-zero if any case fails, so it is usable as
+a CI gate. A failing case does not stop the run: the suite reports every mismatch,
+then exits non-zero at the end. Expected results are hand-computed literals rather
+than values recomputed by the code under test.
+
+Two of the cases pass `out` as an alias of `a` or `b`, which `eigen_wasm.cpp`
+documents as allowed. That guarantee rests on Eigen evaluating the product into a
+temporary before storing into `out`, so it is pinned by a test rather than left as
+a comment.
 
 `.github/workflows/wasm.yml` runs it on GitHub Actions against the
 `emscripten/emsdk` image, on any change under `wasm/` or `Eigen/`. Eigen's own
@@ -93,6 +104,9 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 
 | File | Purpose |
 |---|---|
-| `build.sh` | emcc invocation and output paths |
+| `build.sh` | `em++` invocation and output paths |
 | `eigen_wasm.cpp` | `matMul3x3` wrapper over `Eigen::Map` |
 | `test_matmul.js` | Table-driven tests over the exported function |
+
+`build.sh` honours `EMCC`, `SRC` and `OUT` from the environment; unset, it compiles
+`eigen_wasm.cpp` to `eigen_wasm.js` beside itself.
