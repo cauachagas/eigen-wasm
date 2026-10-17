@@ -8,6 +8,7 @@
   "scripts": {
     "build": "bash scripts/build.sh",
     "test": "for f in test/test_*.js; do node \"$f\" || exit 1; done",
+    "bench": "node bench/bench_poisson.js",
     "prepare": "git submodule update --init --recursive"
   },
   "keywords": [
