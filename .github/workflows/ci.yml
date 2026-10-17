@@ -2,29 +2,22 @@ name: CI
 
 on:
   push:
-    branches: [ master, main, standalone, standalone-filtered ]
+    branches: [ main ]
   pull_request:
-    branches: [ master, main, standalone, standalone-filtered ]
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build-and-test:
+    name: Build and Run Test Suites
     runs-on: ubuntu-latest
+    container: emscripten/emsdk:latest
 
     steps:
       - name: Checkout repository with submodules
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Setup Emscripten
-        uses: mymind/setup-emscripten@v1
-        with:
-          version: 3.1.58
 
       - name: Build WebAssembly Module
         run: npm run build
