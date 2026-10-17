@@ -5,23 +5,36 @@
 set -euo pipefail
 
 # Eigen WASM build script.
-# Flags: -O3, ALLOW_MEMORY_GROWTH, EXPORT_ES6, MODULARIZE. No --bind: the wrapper is
-# EMSCRIPTEN_KEEPALIVE C, not embind.
-# Memory is read/written with setValue/getValue, not HEAPF64 views: ALLOW_MEMORY_GROWTH
-# detaches typed-array views on growth.
-# C++17 is required by Emscripten, not by Eigen (Eigen itself is C++14, CMakeLists.txt:220).
-
-# Requires an activated emsdk; it bundles its own Python and Node.
-#   source /path/to/emsdk/emsdk_env.sh
-# CI does not use that path: .github/workflows/wasm.yml runs emscripten/emsdk
-# from the emsdk Docker image, where em++ is already on PATH.
-#
-# The compiler is not configurable. em++ links libstdc++; emcc does not, so the
-# 3x3 product compiles under emcc but any Eigen decomposition (LU, QR, SVD, ...)
-# fails to link on __cxa_allocate_exception. Only SRC and OUT are overridable.
+# Flags: -O3, ALLOW_MEMORY_GROWTH, EXPORT_ES6, MODULARIZE.
+# C++17 is required by Emscripten.
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd "$HERE/.." && pwd)   # Eigen/ lives at the repository root
+ROOT=$(cd "$HERE/.." && pwd)
+
+# Determine Eigen headers directory:
+# 1. Respect explicit EIGEN_DIR or EIGEN_INCLUDE_DIR if set
+# 2. Check submodule at deps/eigen
+# 3. Check local repo root (in-tree fallback)
+EIGEN_DIR="${EIGEN_DIR:-${EIGEN_INCLUDE_DIR:-}}"
+
+if [ -n "$EIGEN_DIR" ]; then
+  if [ -f "$EIGEN_DIR/Eigen/Core" ]; then
+    EIGEN_INCLUDE_PATH="$EIGEN_DIR"
+  elif [ -f "$EIGEN_DIR/include/eigen3/Eigen/Core" ]; then
+    EIGEN_INCLUDE_PATH="$EIGEN_DIR/include/eigen3"
+  else
+    echo "Warning: EIGEN_DIR is set to '$EIGEN_DIR', but Eigen/Core was not found." >&2
+    EIGEN_INCLUDE_PATH="$EIGEN_DIR"
+  fi
+elif [ -f "$ROOT/deps/eigen/Eigen/Core" ]; then
+  EIGEN_INCLUDE_PATH="$ROOT/deps/eigen"
+elif [ -f "$ROOT/Eigen/Core" ]; then
+  EIGEN_INCLUDE_PATH="$ROOT"
+else
+  echo "Error: Eigen headers not found in deps/eigen. Did you initialize submodules?" >&2
+  echo "Run: git submodule update --init --recursive" >&2
+  exit 1
+fi
 
 # Auto-activate emsdk if em++ is not on PATH and /tmp/emsdk exists
 if ! command -v em++ >/dev/null 2>&1; then
@@ -32,17 +45,18 @@ if ! command -v em++ >/dev/null 2>&1; then
   else
     echo "Error: em++ not found in PATH." >&2
     echo "Please activate emsdk first:" >&2
-    echo "  source /path/to/emsdk/emsdk_env.sh (e.g. source /tmp/emsdk/emsdk_env.sh)" >&2
+    echo "  source /path/to/emsdk/emsdk_env.sh" >&2
     exit 1
   fi
 fi
 
-SRC=${SRC:-$HERE/eigen_wasm.cpp}
-OUT=${OUT:-$HERE/eigen_wasm.js}
-
+SRC=${SRC:-$ROOT/src/eigen_wasm.cpp}
+BUILD_DIR=${BUILD_DIR:-$ROOT/build}
+mkdir -p "$BUILD_DIR"
+OUT=${OUT:-$BUILD_DIR/eigen_wasm.js}
 
 em++ "$SRC" -o "$OUT" \
-  -I"$ROOT" \
+  -I"$EIGEN_INCLUDE_PATH" \
   -O3 \
   -s ALLOW_MEMORY_GROWTH=1 \
   -s STACK_SIZE=16MB \

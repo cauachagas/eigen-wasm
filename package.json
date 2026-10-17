@@ -1,0 +1,26 @@
+{
+  "name": "eigen-wasm",
+  "version": "0.1.0",
+  "description": "High-performance WebAssembly build of Eigen linear algebra library (Core and Dense modules)",
+  "main": "build/eigen_wasm.js",
+  "module": "build/eigen_wasm.js",
+  "type": "module",
+  "scripts": {
+    "build": "bash scripts/build.sh",
+    "test": "for f in test/test_*.js; do node \"$f\" || exit 1; done",
+    "prepare": "git submodule update --init --recursive"
+  },
+  "keywords": [
+    "eigen",
+    "webassembly",
+    "wasm",
+    "linear-algebra",
+    "matrix",
+    "math"
+  ],
+  "author": "Cauã Chagas",
+  "license": "MPL-2.0",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

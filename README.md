@@ -16,15 +16,24 @@ found on `$PATH`.
 
 ## Build
 
+Clone the repository with submodules:
+
 ```bash
-./wasm/build.sh
+git clone --recursive https://github.com/cauachagas/eigen-wasm.git
+cd eigen-wasm
 ```
 
-Writes `wasm/eigen_wasm.js` and `wasm/eigen_wasm.wasm`. Both are gitignored;
-`build.sh` regenerates them. The script resolves paths from its own location, so
-it can be run from anywhere.
+Build the WebAssembly module:
 
-`build.sh` compiles with `-std=c++17` because Emscripten requires it. Eigen itself
+```bash
+npm run build
+# or: ./scripts/build.sh
+```
+
+Writes `build/eigen_wasm.js` and `build/eigen_wasm.wasm`. Both are gitignored;
+`scripts/build.sh` regenerates them.
+
+`scripts/build.sh` compiles with `-std=c++17` because Emscripten requires it. Eigen itself
 is C++14 and needs no newer standard here.
 
 It invokes `em++`, not `emcc`. `emcc` links no C++ runtime: the 3x3 product happens
@@ -34,29 +43,32 @@ to touch no libstdc++ symbol, but any Eigen decomposition needs
 
 ## Test
 
+Run all 18 test suites:
+
 ```bash
-node wasm/test_matmul.js
-node wasm/test_determinant.js
-node wasm/test_matrix_ops.js
-node wasm/test_lu.js
-node wasm/test_partial_lu.js
-node wasm/test_cholesky.js
-node wasm/test_dense_solvers.js
-node wasm/test_qr.js
-node wasm/test_matrix_solvers.js
-node wasm/test_svd.js
-node wasm/test_eigen.js
-node wasm/test_ldlt.js
-node wasm/test_colpiv_qr.js
-node wasm/test_cod.js
-node wasm/test_bdc_svd.js
-node wasm/test_general_eigen.js
+npm test
+# or: for f in test/test_*.js; do node "$f"; done
 ```
 
-Or run all test suites in one go:
+Or individual test suites:
 
 ```bash
-for f in wasm/test_*.js; do node "$f"; done
+node test/test_matmul.js
+node test/test_determinant.js
+node test/test_matrix_ops.js
+node test/test_lu.js
+node test/test_partial_lu.js
+node test/test_cholesky.js
+node test/test_dense_solvers.js
+node test/test_qr.js
+node test/test_matrix_solvers.js
+node test/test_svd.js
+node test/test_eigen.js
+node test/test_ldlt.js
+node test/test_colpiv_qr.js
+node test/test_cod.js
+node test/test_bdc_svd.js
+node test/test_general_eigen.js
 ```
 
 
