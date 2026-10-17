@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implementar `solvePartialLU(const double* a, const double* b, int n, double* out)` com guardas `validDim(n)` e verificação de invertibilidade/não-finitos
-- [ ] Implementar `invPartialLU(const double* a, int n, double* out)` com guardas `validDim(n)` e checagem de invertibilidade
-- [ ] Criar a suíte de testes `wasm/test_partial_lu.js` adaptando casos analíticos e casos singulares de `test/lu.cpp`
-- [ ] Validar preservação de sentinelas em falhas e rejeição para n <= 0 ou n > 2048
-- [ ] Teste passando 100% via Node.js
+- [x] Implementar `solvePartialLU(const double* a, const double* b, int n, double* out)` com guardas `validDim(n)` e verificação de invertibilidade/não-finitos
+- [x] Implementar `invPartialLU(const double* a, int n, double* out)` com guardas `validDim(n)` e checagem de invertibilidade
+- [x] Criar a suíte de testes `wasm/test_partial_lu.js` adaptando casos analíticos e casos singulares de `test/lu.cpp`
+- [x] Validar preservação de sentinelas em falhas e rejeição para n <= 0 ou n > 2048
+- [x] Teste passando 100% via Node.js
