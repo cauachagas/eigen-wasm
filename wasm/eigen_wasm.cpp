@@ -43,12 +43,27 @@ enum MatrixNormType {
 
 static inline bool isPartialPivLUInvertible(const Eigen::PartialPivLU<RowMajorMatrix>& plu) {
   double minDiag = plu.matrixLU().diagonal().cwiseAbs().minCoeff();
-  double maxDiag = plu.matrixLU().diagonal().cwiseAbs().maxCoeff();
-  if (maxDiag <= 0.0 || minDiag <= 0.0) {
+  if (minDiag == 0.0) {
     return false;
   }
-  if ((minDiag / maxDiag) <= 1e-12 || plu.rcond() <= 1e-12) {
+  // Condition number threshold against machine precision eps (~2.22e-16).
+  // Guards against rank-deficient roundoff while permitting well-scaled matrices.
+  if (plu.rcond() <= 1e-15) {
     return false;
+  }
+  return true;
+}
+
+template <unsigned int Mode>
+static inline bool isTriangular(const RowMajorMatrix& A, int n) {
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      if (Mode == Eigen::Lower && j > i) {
+        if (Eigen::numext::abs(A(i, j)) > 1e-12) return false;
+      } else if (Mode == Eigen::Upper && i > j) {
+        if (Eigen::numext::abs(A(i, j)) > 1e-12) return false;
+      }
+    }
   }
   return true;
 }
@@ -63,9 +78,12 @@ static inline int solveTriangularImpl(const double* a, const double* b, int n, i
   if (!A.allFinite() || !rhs.allFinite()) {
     return Eigen::InvalidInput;
   }
+  if (!isTriangular<Mode>(A, n)) {
+    return Eigen::InvalidInput;
+  }
 
   if (unit_diag == 0) {
-    if (A.diagonal().cwiseAbs().minCoeff() == 0.0) {
+    if (A.diagonal().cwiseAbs().minCoeff() <= 1e-15) {
       return Eigen::NumericalIssue;
     }
   }
@@ -793,6 +811,11 @@ int cod(const double* a, int rows, int cols, double* q_out, double* t_out, doubl
   RowMajorMatrix Q = codDecomp.householderQ();
   RowMajorMatrix T = RowMajorMatrix::Zero(rows, cols);
   int r = static_cast<int>(codDecomp.rank());
+  // Complete Orthogonal Decomposition factorizes A * P = Q * [T11 0; 0 0] * Z.
+  // In Eigen, matrixT() stores T11 in the top-left r-by-r block; entries in the upper
+  // trapezoid outside r-by-r store Householder reflection vectors that form Z.
+  // Therefore, only the upper-triangular r-by-r block T11 is copied into T; the remainder
+  // of the rows x cols matrix T is zero so that Q * T * Z * P^T reconstructs A.
   if (r > 0) {
     T.topLeftCorner(r, r) = codDecomp.matrixT().topLeftCorner(r, r).template triangularView<Eigen::Upper>();
   }
@@ -828,6 +851,9 @@ int pseudoInverse(const double* a, int rows, int cols, double* pinv_out) {
   }
 
   Eigen::CompleteOrthogonalDecomposition<RowMajorMatrix> codDecomp(A);
+  if (codDecomp.info() != Eigen::Success) {
+    return codDecomp.info();
+  }
   RowMajorMatrix pinv = codDecomp.pseudoInverse();
   if (!pinv.allFinite()) {
     return Eigen::NumericalIssue;
