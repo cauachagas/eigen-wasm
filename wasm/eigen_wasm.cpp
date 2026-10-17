@@ -548,6 +548,77 @@ int rank(const double* a, int rows, int cols, int* rank_out) {
   return Eigen::Success;
 }
 
+// Complete Orthogonal Decomposition (COD)
+// Preconditions: A is rows x cols row-major.
+// q_out: rows x rows, t_out: rows x cols, z_out: cols x cols, perm_out: cols ints, rank_out: 1 int.
+EMSCRIPTEN_KEEPALIVE
+int cod(const double* a, int rows, int cols, double* q_out, double* t_out, double* z_out, int* perm_out, int* rank_out) {
+  if (a == nullptr || q_out == nullptr || t_out == nullptr || z_out == nullptr ||
+      perm_out == nullptr || rank_out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::CompleteOrthogonalDecomposition<RowMajorMatrix> codDecomp(A);
+  if (codDecomp.info() != Eigen::Success) {
+    return codDecomp.info();
+  }
+
+  RowMajorMatrix Q = codDecomp.householderQ();
+  RowMajorMatrix T = RowMajorMatrix::Zero(rows, cols);
+  int r = static_cast<int>(codDecomp.rank());
+  if (r > 0) {
+    T.topLeftCorner(r, r) = codDecomp.matrixT().topLeftCorner(r, r).template triangularView<Eigen::Upper>();
+  }
+  RowMajorMatrix Z = codDecomp.matrixZ();
+
+  int qEntries = rows * rows;
+  for (int i = 0; i < qEntries; ++i) q_out[i] = Q.data()[i];
+
+  int tEntries = rows * cols;
+  for (int i = 0; i < tEntries; ++i) t_out[i] = T.data()[i];
+
+  int zEntries = cols * cols;
+  for (int i = 0; i < zEntries; ++i) z_out[i] = Z.data()[i];
+
+  const auto& p = codDecomp.colsPermutation();
+  for (int i = 0; i < cols; ++i) perm_out[i] = static_cast<int>(p.indices()[i]);
+
+  *rank_out = r;
+  return Eigen::Success;
+}
+
+// Moore-Penrose pseudo-inverse via CompleteOrthogonalDecomposition.
+// Preconditions: A is rows x cols, pinv_out is cols x rows row-major.
+EMSCRIPTEN_KEEPALIVE
+int pseudoInverse(const double* a, int rows, int cols, double* pinv_out) {
+  if (a == nullptr || pinv_out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::CompleteOrthogonalDecomposition<RowMajorMatrix> codDecomp(A);
+  RowMajorMatrix pinv = codDecomp.pseudoInverse();
+  if (!pinv.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+
+  int total = cols * rows;
+  for (int i = 0; i < total; ++i) {
+    pinv_out[i] = pinv.data()[i];
+  }
+
+  return Eigen::Success;
+}
+
 // Deterministic matrix generator with prescribed singular values.
 // Ported to use explicit linear congruential PRNG so results are platform-independent.
 EMSCRIPTEN_KEEPALIVE

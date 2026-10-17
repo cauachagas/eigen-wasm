@@ -4,10 +4,10 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implementar `cod(const double* a, int rows, int cols, double* q_out, double* t_out, double* z_out, int* perm_out, int* rank_out)`
-- [ ] Implementar `pseudoInverse(const double* a, int rows, int cols, double* pinv_out)`
-- [ ] Criar a suíte `wasm/test_cod.js` adaptando matrizes de teste e tolerâncias de `test/qr_colpivoting.cpp`
-- [ ] Validar preservação de sentinelas em falhas e rejeição de dimensões inválidas
-- [ ] Teste passando 100% via Node.js
+- [x] Implementar `cod(const double* a, int rows, int cols, double* q_out, double* t_out, double* z_out, int* perm_out, int* rank_out)`
+- [x] Implementar `pseudoInverse(const double* a, int rows, int cols, double* pinv_out)`
+- [x] Criar a suíte `wasm/test_cod.js` adaptando matrizes de teste e tolerâncias de `test/qr_colpivoting.cpp`
+- [x] Validar preservação de sentinelas em falhas e rejeição de dimensões inválidas
+- [x] Teste passando 100% via Node.js
