@@ -9,11 +9,13 @@ O `eigen-wasm` é um porte WebAssembly autônomo dos módulos Core e Dense da bi
 - **`deps/eigen/`**: Submódulo git contendo os headers do upstream Eigen (somente leitura, pinned).
 - **`src/`**: Implementação C++ exposta para WebAssembly (`src/eigen_wasm.cpp`).
 - **`test/`**: Suítes de teste em JavaScript executadas via Node.js (`test/test_*.js`).
+- **`bench/`**: Suíte de benchmarking e geradores Poisson (`bench/bench_poisson.js`, `bench/poisson.js`, `bench/native_poisson.cpp`).
 - **`scripts/build.sh`**: Script de compilação Emscripten que gera os artefatos em `build/eigen_wasm.js` e `build/eigen_wasm.wasm`.
 - **`build/`**: Artefatos compilados (gitignored). O arquivo `test/eigen_wasm.js` serve como ponto de reexportação para as suítes de teste.
 - **Comandos canônicos**:
   - Compilar: `npm run build` (ou `./scripts/build.sh`)
   - Testar: `npm test` (ou `node test/test_<nome>.js`)
+  - Benchmark: `npm run bench` (ou `node bench/bench_poisson.js [--quick] [--full] [--no-native]`)
 
 ---
 
@@ -109,3 +111,6 @@ O `eigen-wasm` é um porte WebAssembly autônomo dos módulos Core e Dense da bi
 10. **Gerenciamento de Instâncias e Handles (Opaque Handles):** Em rotinas com ciclo de vida, handles devem ser inteiros positivos únicos com verificação ativa contra colisões em wraparound. Falhas de alocação de memória (`std::bad_alloc`) devem retornar estritamente `3` (`InvalidInput`), reservando `1` (`NumericalIssue`) exclusivamente para divergência ou instabilidade matemática.
 11. **Validação de Finitude em Parâmetros Escalares:** Parâmetros numéricos de tolerância, escala ou fatores numéricos escalares passados pelo chamador devem ser explicitamente validados com `std::isfinite()`. Valores não-finitos (`NaN`, `Infinity`) devem retornar estritamente `3` (`InvalidInput`), preservando os buffers de saída intactos.
 12. **Garantia de Tempo de Vida de Estruturas Convertidas (Scope Lifetime):** Ao converter matrizes (ex.: CSR para CSC) para alimentar solvers ou rotinas que armazenam referências (`Eigen::Ref` ou ponteiros internos), o objeto convertido (`cscStorage`) DEVE ser declarado no escopo externo da rotina, garantindo que sua memória permaneça válida até a conclusão de todas as operações de `solve()`.
+13. **Unificação de Validação de Matrizes Esparsas:** Toda rotina C++/Wasm que consome entradas esparsas compactadas (CSC/CSR) DEVE utilizar a função utilitária `validateSparseMatrix(rows, cols, nnz, values, innerIndices, outerStarts, storageOrder)` em `src/sparse_wasm.hpp` para assegurar conformidade dimensional, teto de não-zeros, finitude e integridade de ponteiros em uma única guarda, preservando estritamente os buffers de saída intocados em caso de erro.
+14. **Acesso Canônico à Memória Linear WebAssembly em Node.js:** Em builds modularizados do Emscripten, o acesso à memória linear nos testes e benchmarks deve utilizar `Module.setValue(ptr, val, type)` e `Module.getValue(ptr, type)`, evitando dependência de propriedades de heap brutas (`Module.HEAPF64`) a menos que explicitamente exportadas no `scripts/build.sh`.
+15. **Benchmarking Comparativo com Linha de Base Nativa:** Benchmarks de performance devem utilizar problemas canônicos (ex.: Poisson 2D/3D), suportando flags de execução rápida (`--quick`) e comparação lado a lado contra código nativo C++ (-O3) compilado a partir de `deps/eigen`, fornecendo degradação suave quando um compilador nativo não estiver disponível.
