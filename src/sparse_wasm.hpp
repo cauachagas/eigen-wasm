@@ -82,6 +82,31 @@ enum SparseStorageOrder {
   StorageOrderCSR = 1
 };
 
+static inline bool validateSparseMatrix(
+    int rows, int cols, int nnz,
+    const double* values, const int* innerIndices, const int* outerStarts,
+    int storageOrder = StorageOrderCSC
+) {
+  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr) {
+    return false;
+  }
+  if (!validSparseDim(rows, cols) || !validSparseNnz(nnz, rows, cols)) {
+    return false;
+  }
+  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+    return false;
+  }
+  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
+  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
+  if (!validCompressedStructure(outerStarts, innerIndices, outerSize, innerBound, nnz)) {
+    return false;
+  }
+  if (!allFinite(values, nnz)) {
+    return false;
+  }
+  return true;
+}
+
 template <typename SparseMatType>
 static inline void copyCompressedSparse(
     const SparseMatType& mat,
@@ -272,22 +297,13 @@ int sparseMatMulVec(
     int storageOrder,
     const double* x, double* outY
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      x == nullptr || outY == nullptr) {
+  if (x == nullptr || outY == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rows, cols) || !validSparseNnz(nnz, rows, cols)) {
+  if (!validateSparseMatrix(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnz)) {
-    return Eigen::InvalidInput;
-  }
-  if (!allFinite(aValues, nnz) || !allFinite(x, cols)) {
+  if (!allFinite(x, cols)) {
     return Eigen::InvalidInput;
   }
 
@@ -321,17 +337,10 @@ int sparseMatMulDense(
     int storageOrder,
     const double* b, double* outC
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      b == nullptr || outC == nullptr) {
+  if (b == nullptr || outC == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rowsA, colsA) || colsB < 1 || colsB > kMaxSparseDimension) {
-    return Eigen::InvalidInput;
-  }
-  if (!validSparseNnz(nnz, rowsA, colsA)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+  if (colsB < 1 || colsB > kMaxSparseDimension) {
     return Eigen::InvalidInput;
   }
   // Prevent int32 overflow and memory exhaustion on dense matrices
@@ -340,13 +349,10 @@ int sparseMatMulDense(
   if (bElements > 20000000.0 || cElements > 20000000.0) {
     return Eigen::InvalidInput;
   }
-
-  int outerSize = (storageOrder == StorageOrderCSC) ? colsA : rowsA;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rowsA : colsA;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnz)) {
+  if (!validateSparseMatrix(rowsA, colsA, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
-  if (!allFinite(aValues, nnz) || !allFinite(b, static_cast<int>(bElements))) {
+  if (!allFinite(b, static_cast<int>(bElements))) {
     return Eigen::InvalidInput;
   }
 
@@ -386,24 +392,11 @@ int sparseAddGetNnz(
     int storageOrder,
     int* outNnz
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      bValues == nullptr || bInnerIndices == nullptr || bOuterStarts == nullptr ||
-      outNnz == nullptr) {
+  if (outNnz == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rows, cols) || !validSparseNnz(nnzA, rows, cols) || !validSparseNnz(nnzB, rows, cols)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnzA) ||
-      !validCompressedStructure(bOuterStarts, bInnerIndices, outerSize, innerBound, nnzB)) {
-    return Eigen::InvalidInput;
-  }
-  if (!allFinite(aValues, nnzA) || !allFinite(bValues, nnzB)) {
+  if (!validateSparseMatrix(rows, cols, nnzA, aValues, aInnerIndices, aOuterStarts, storageOrder) ||
+      !validateSparseMatrix(rows, cols, nnzB, bValues, bInnerIndices, bOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
 
@@ -447,24 +440,11 @@ int sparseAdd(
     int storageOrder,
     double* outValues, int* outInnerIndices, int* outOuterStarts
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      bValues == nullptr || bInnerIndices == nullptr || bOuterStarts == nullptr ||
-      outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
+  if (outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rows, cols) || !validSparseNnz(nnzA, rows, cols) || !validSparseNnz(nnzB, rows, cols)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnzA) ||
-      !validCompressedStructure(bOuterStarts, bInnerIndices, outerSize, innerBound, nnzB)) {
-    return Eigen::InvalidInput;
-  }
-  if (!allFinite(aValues, nnzA) || !allFinite(bValues, nnzB)) {
+  if (!validateSparseMatrix(rows, cols, nnzA, aValues, aInnerIndices, aOuterStarts, storageOrder) ||
+      !validateSparseMatrix(rows, cols, nnzB, bValues, bInnerIndices, bOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
 
@@ -508,22 +488,13 @@ int sparseScale(
     double alpha,
     double* outValues, int* outInnerIndices, int* outOuterStarts
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
+  if (outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rows, cols) || !validSparseNnz(nnz, rows, cols)) {
+  if (!std::isfinite(alpha)) {
     return Eigen::InvalidInput;
   }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnz)) {
-    return Eigen::InvalidInput;
-  }
-  if (!std::isfinite(alpha) || !allFinite(aValues, nnz)) {
+  if (!validateSparseMatrix(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
 
@@ -537,6 +508,7 @@ int sparseScale(
       }
     }
     if (outOuterStarts != aOuterStarts) {
+      int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
       for (int i = 0; i <= outerSize; ++i) {
         outOuterStarts[i] = aOuterStarts[i];
       }
@@ -556,22 +528,10 @@ int sparseTranspose(
     int storageOrder,
     double* outValues, int* outInnerIndices, int* outOuterStarts
 ) {
-  if (aValues == nullptr || aInnerIndices == nullptr || aOuterStarts == nullptr ||
-      outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
+  if (outValues == nullptr || outInnerIndices == nullptr || outOuterStarts == nullptr) {
     return Eigen::InvalidInput;
   }
-  if (!validSparseDim(rows, cols) || !validSparseNnz(nnz, rows, cols)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  int outerSize = (storageOrder == StorageOrderCSC) ? cols : rows;
-  int innerBound = (storageOrder == StorageOrderCSC) ? rows : cols;
-  if (!validCompressedStructure(aOuterStarts, aInnerIndices, outerSize, innerBound, nnz)) {
-    return Eigen::InvalidInput;
-  }
-  if (!allFinite(aValues, nnz)) {
+  if (!validateSparseMatrix(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
 
@@ -615,22 +575,13 @@ int sparseCholeskyFactorize(
     int32_t solverType,
     int32_t* outHandle
 ) {
-  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr || outHandle == nullptr) {
-    return Eigen::InvalidInput;
-  }
-  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+  if (outHandle == nullptr) {
     return Eigen::InvalidInput;
   }
   if (solverType != SolverSimplicialLDLT && solverType != SolverSimplicialLLT) {
     return Eigen::InvalidInput;
   }
-  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
-    return Eigen::InvalidInput;
-  }
-  if (!allFinite(values, nnz)) {
+  if (!validateSparseMatrix(n, n, nnz, values, innerIndices, outerStarts, storageOrder)) {
     return Eigen::InvalidInput;
   }
 
@@ -739,27 +690,20 @@ int sparseConjugateGradient(
     int32_t* outIterations,
     double* outEstimatedError
 ) {
-  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr ||
-      b == nullptr || outX == nullptr) {
-    return Eigen::InvalidInput;
-  }
-  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  if (nrhs < 1) {
+  if (b == nullptr || outX == nullptr || nrhs < 1) {
     return Eigen::InvalidInput;
   }
   double totalElements = static_cast<double>(n) * static_cast<double>(nrhs);
   if (totalElements > 20000000.0) {
     return Eigen::InvalidInput;
   }
-  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
+  if (!std::isfinite(tolerance)) {
     return Eigen::InvalidInput;
   }
-  if (!allFinite(values, nnz) || !allFinite(b, n * nrhs) || !std::isfinite(tolerance)) {
+  if (!validateSparseMatrix(n, n, nnz, values, innerIndices, outerStarts, storageOrder)) {
+    return Eigen::InvalidInput;
+  }
+  if (!allFinite(b, n * nrhs)) {
     return Eigen::InvalidInput;
   }
 
@@ -867,27 +811,20 @@ int sparseBiCGSTAB(
     int32_t* outIterations,
     double* outEstimatedError
 ) {
-  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr ||
-      b == nullptr || outX == nullptr) {
-    return Eigen::InvalidInput;
-  }
-  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
-    return Eigen::InvalidInput;
-  }
-  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
-    return Eigen::InvalidInput;
-  }
-  if (nrhs < 1) {
+  if (b == nullptr || outX == nullptr || nrhs < 1) {
     return Eigen::InvalidInput;
   }
   double totalElements = static_cast<double>(n) * static_cast<double>(nrhs);
   if (totalElements > 20000000.0) {
     return Eigen::InvalidInput;
   }
-  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
+  if (!std::isfinite(tolerance)) {
     return Eigen::InvalidInput;
   }
-  if (!allFinite(values, nnz) || !allFinite(b, n * nrhs) || !std::isfinite(tolerance)) {
+  if (!validateSparseMatrix(n, n, nnz, values, innerIndices, outerStarts, storageOrder)) {
+    return Eigen::InvalidInput;
+  }
+  if (!allFinite(b, n * nrhs)) {
     return Eigen::InvalidInput;
   }
 

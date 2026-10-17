@@ -29,6 +29,15 @@ const sparseScale = Module.cwrap('sparseScale', 'number', [
 const sparseTranspose = Module.cwrap('sparseTranspose', 'number', [
   'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'
 ]);
+const sparseCholeskyFactorize = Module.cwrap('sparseCholeskyFactorize', 'number', [
+  'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'
+]);
+const sparseConjugateGradient = Module.cwrap('sparseConjugateGradient', 'number', [
+  'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'
+]);
+const sparseBiCGSTAB = Module.cwrap('sparseBiCGSTAB', 'number', [
+  'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number', 'number'
+]);
 
 const SUCCESS = 0;
 const INVALID_INPUT = 3;
@@ -204,6 +213,116 @@ function readInts(ptr, count) {
   Module._free(outTransVals);
   Module._free(outTransInner);
   Module._free(outTransOuter);
+}
+
+// -----------------------------------------------------------------------------
+// Test 4: Invalid storageOrder Rejected across Solvers and Ops (REQ-SP-060)
+// -----------------------------------------------------------------------------
+{
+  const validOuter = allocInts([0, 1, 2]);
+  const validInner = allocInts([0, 1]);
+  const validVals = allocDoubles([4.0, 4.0]);
+  const n = 2;
+  const nnz = 2;
+  const INVALID_STORAGE = 2;
+
+  // sparseTranspose with invalid storageOrder
+  const outTransVals = allocDoubles([SENTINEL_VAL, SENTINEL_VAL]);
+  const outTransInner = allocInts([SENTINEL_INT, SENTINEL_INT]);
+  const outTransOuter = allocInts([SENTINEL_INT, SENTINEL_INT, SENTINEL_INT]);
+  report('sparseTranspose rejects invalid storageOrder',
+    sparseTranspose(n, n, nnz, validVals, validInner, validOuter, INVALID_STORAGE, outTransVals, outTransInner, outTransOuter),
+    INVALID_INPUT);
+  report('sparseTranspose preserves outValues on invalid storageOrder', readDoubles(outTransVals, 1)[0], SENTINEL_VAL);
+
+  // sparseScale with invalid storageOrder
+  const outScaleVals = allocDoubles([SENTINEL_VAL, SENTINEL_VAL]);
+  const outScaleInner = allocInts([SENTINEL_INT, SENTINEL_INT]);
+  const outScaleOuter = allocInts([SENTINEL_INT, SENTINEL_INT, SENTINEL_INT]);
+  report('sparseScale rejects invalid storageOrder',
+    sparseScale(n, n, nnz, validVals, validInner, validOuter, INVALID_STORAGE, 2.0, outScaleVals, outScaleInner, outScaleOuter),
+    INVALID_INPUT);
+  report('sparseScale preserves outValues on invalid storageOrder', readDoubles(outScaleVals, 1)[0], SENTINEL_VAL);
+
+  // sparseCholeskyFactorize with invalid storageOrder
+  const outHandle = allocInts([SENTINEL_INT]);
+  report('sparseCholeskyFactorize rejects invalid storageOrder',
+    sparseCholeskyFactorize(validVals, validInner, validOuter, n, nnz, INVALID_STORAGE, 0, outHandle),
+    INVALID_INPUT);
+  report('sparseCholeskyFactorize preserves outHandle on invalid storageOrder', readInts(outHandle, 1)[0], SENTINEL_INT);
+
+  // sparseConjugateGradient with invalid storageOrder
+  const b = allocDoubles([1.0, 1.0]);
+  const outXCG = allocDoubles([SENTINEL_VAL, SENTINEL_VAL]);
+  const outItersCG = allocInts([SENTINEL_INT]);
+  const outErrCG = allocDoubles([SENTINEL_VAL]);
+  report('sparseConjugateGradient rejects invalid storageOrder',
+    sparseConjugateGradient(validVals, validInner, validOuter, n, nnz, INVALID_STORAGE, b, 1, outXCG, 100, 1e-6, outItersCG, outErrCG),
+    INVALID_INPUT);
+  report('sparseConjugateGradient preserves outX on invalid storageOrder', readDoubles(outXCG, 1)[0], SENTINEL_VAL);
+
+  // sparseBiCGSTAB with invalid storageOrder
+  const outXBiCG = allocDoubles([SENTINEL_VAL, SENTINEL_VAL]);
+  const outItersBiCG = allocInts([SENTINEL_INT]);
+  const outErrBiCG = allocDoubles([SENTINEL_VAL]);
+  report('sparseBiCGSTAB rejects invalid storageOrder',
+    sparseBiCGSTAB(validVals, validInner, validOuter, n, nnz, INVALID_STORAGE, b, 1, outXBiCG, 100, 1e-6, outItersBiCG, outErrBiCG),
+    INVALID_INPUT);
+  report('sparseBiCGSTAB preserves outX on invalid storageOrder', readDoubles(outXBiCG, 1)[0], SENTINEL_VAL);
+
+  Module._free(validOuter);
+  Module._free(validInner);
+  Module._free(validVals);
+  Module._free(outTransVals);
+  Module._free(outTransInner);
+  Module._free(outTransOuter);
+  Module._free(outScaleVals);
+  Module._free(outScaleInner);
+  Module._free(outScaleOuter);
+  Module._free(outHandle);
+  Module._free(b);
+  Module._free(outXCG);
+  Module._free(outItersCG);
+  Module._free(outErrCG);
+  Module._free(outXBiCG);
+  Module._free(outItersBiCG);
+  Module._free(outErrBiCG);
+}
+
+// -----------------------------------------------------------------------------
+// Test 5: validateSparseMatrix Non-Finite (NaN) Detection with Untouched Invariant
+// -----------------------------------------------------------------------------
+{
+  const validOuter = allocInts([0, 1, 2]);
+  const validInner = allocInts([0, 1]);
+  const nanVals = allocDoubles([NaN, 4.0]);
+  const n = 2;
+  const nnz = 2;
+
+  const outHandle = allocInts([SENTINEL_INT]);
+  report('sparseCholeskyFactorize rejects NaN value with INVALID_INPUT',
+    sparseCholeskyFactorize(nanVals, validInner, validOuter, n, nnz, 0, 0, outHandle),
+    INVALID_INPUT);
+  report('sparseCholeskyFactorize preserves outHandle on NaN', readInts(outHandle, 1)[0], SENTINEL_INT);
+
+  const b = allocDoubles([1.0, 1.0]);
+  const outX = allocDoubles([SENTINEL_VAL, SENTINEL_VAL]);
+  report('sparseConjugateGradient rejects NaN matrix with INVALID_INPUT',
+    sparseConjugateGradient(nanVals, validInner, validOuter, n, nnz, 0, b, 1, outX, 100, 1e-6, 0, 0),
+    INVALID_INPUT);
+  report('sparseConjugateGradient preserves outX on NaN matrix', readDoubles(outX, 1)[0], SENTINEL_VAL);
+
+  report('sparseBiCGSTAB rejects NaN matrix with INVALID_INPUT',
+    sparseBiCGSTAB(nanVals, validInner, validOuter, n, nnz, 0, b, 1, outX, 100, 1e-6, 0, 0),
+    INVALID_INPUT);
+  report('sparseBiCGSTAB preserves outX on NaN matrix', readDoubles(outX, 1)[0], SENTINEL_VAL);
+
+  Module._free(validOuter);
+  Module._free(validInner);
+  Module._free(nanVals);
+  Module._free(outHandle);
+  Module._free(b);
+  Module._free(outX);
 }
 
 if (failed > 0) {
