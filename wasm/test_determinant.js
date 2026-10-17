@@ -136,7 +136,7 @@ const rejected = [
   ['non-square, more rows than cols', [1, 2, 3, 4, 5, 6], 3, 2, []],
   ['non-square, more cols than rows', [1, 2, 3, 4, 5, 6], 2, 3, []],
   ['one row above the ceiling', [1, 2, 3, 4], MAX_DIMENSION + 1, MAX_DIMENSION + 1, []],
-  ['the Eigen suite ceiling, 320', [1, 2, 3, 4], 320, 320, []],
+  ['well above the ceiling, 4096', [1, 2, 3, 4], 4096, 4096, []],
 ];
 
 for (const [name, values, rows, cols, out] of rejected) {

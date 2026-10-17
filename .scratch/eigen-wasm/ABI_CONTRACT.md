@@ -23,10 +23,10 @@ Output buffers are **untouched unless the routine returns `Success`**. Callers c
 ## 2. Dimension Bounds & Constraints
 
 - **Minimum dimension**: `1` (all dimensions must be strictly positive; `<= 0` returns `InvalidInput`).
-- **Maximum dimension (Ceiling)**: `255` (`kMaxDimension = 255`).
-  - At dimension `256`, blocked LU raises its block size to 32 and causes out-of-bounds reads in WebAssembly, trapping the module instance.
-  - Dimension `> 255` returns `InvalidInput` before any Eigen routine executes.
-  - The module exports `int maxDimension()` returning this ceiling.
+- **Maximum dimension (Ceiling)**: `2048` (`kMaxDimension = 2048`).
+  - Supported by `STACK_SIZE=16MB`, `INITIAL_MEMORY=128MB`, and `MAXIMUM_MEMORY=4GB`.
+  - Dimension `> 2048` returns `InvalidInput` before any Eigen routine executes.
+  - The module exports `int maxDimension()` returning this ceiling (2048).
 - **Squareness**: Matrix inversion, LU solve, Cholesky, LDLT, Bunch-Kaufman, and eigensolvers require `rows == cols`. Rectangular input returns `InvalidInput`.
 - **Symmetry**: Cholesky, LDLT, Bunch-Kaufman, and symmetric eigensolvers require |A[i,j] - A[j,i]| <= 1e-12 or relative difference <= 1e-6. Asymmetric input returns `InvalidInput`.
 
