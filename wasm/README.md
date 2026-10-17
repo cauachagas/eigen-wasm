@@ -195,8 +195,9 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | File | Purpose |
 |---|---|
 | `build.sh` | `em++` invocation and output paths |
-| `eigen_wasm.cpp` | `matMul3x3`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `matMul`, `svd`, `symmetricEigen` |
+| `eigen_wasm.cpp` | `matMul3x3`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `matMul`, `svd`, `symmetricEigen`, `ldlt`, `bunchKaufman`, `colPivQr`, `generatePrescribedSingularValues`, `bdcSvd`, `generalEigen`, `maxDimension` |
 | `example.js` | Worked example; imported and run by the tests |
+| `test_helpers.js` | Shared test assertions, error constants, buffer helpers, and sentinels |
 | `test_matmul.js` | Table-driven tests over `matMul3x3` |
 | `test_determinant.js` | Value, contract and ceiling tests over `determinant` |
 | `test_lu.js` | Residual, singularity, and contract tests over `solveLU` and `inv` |
@@ -204,10 +205,13 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | `test_qr.js` | Factorization, residual, least squares, and orthogonality tests over `qr` and `solveLeastSquares` |
 | `test_svd.js` | Singular value, reconstruction, and non-finite tests over `svd` |
 | `test_eigen.js` | Analytical, eigenvector residual, and symmetry tests over `symmetricEigen` |
-| `test_ldlt.js` | Positive semidefinite, residual, and symmetry tests over `ldlt` |
+| `test_ldlt.js` | Positive semidefinite, residual, and symmetry tests over `ldlt` and `bunchKaufman` |
 | `test_colpiv_qr.js` | Rank detection, column permutation, and deterministic matrix generation tests over `colPivQr` and `generatePrescribedSingularValues` |
 | `test_bdc_svd.js` | BDCSVD large matrix decomposition and non-finite input tests over `bdcSvd` |
 | `test_general_eigen.js` | General eigensolver, complex conjugate pairs, and convergence tests over `generalEigen` |
+
+For the complete ABI specifications, error contracts, and dimension ceilings, see `.scratch/eigen-wasm/ABI_CONTRACT.md`.
+
 
 `wasm/` is the only local addition to this fork. `Eigen/`, `test/`, `ci/` and `.gitlab-ci.yml` are frozen upstream code, so the Eigen build system does not know this directory exists and the tests here run through GitHub Actions instead of `ctest`.
 
