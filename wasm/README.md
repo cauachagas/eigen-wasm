@@ -34,6 +34,10 @@ Exits 0 when every case passes and non-zero on the first mismatch, so it is usab
 as a CI gate. Expected results are hand-computed literals rather than values
 recomputed by the code under test.
 
+`.github/workflows/wasm.yml` runs it on GitHub Actions against the
+`emscripten/emsdk` image, on any change under `wasm/` or `Eigen/`. Eigen's own
+`.gitlab-ci.yml` is untouched.
+
 ## API
 
 One exported function:
