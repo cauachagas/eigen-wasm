@@ -102,6 +102,35 @@ int solveLU(const double* a, const double* b, int n, double* out) {
   return Eigen::Success;
 }
 
+// Solve linear system A X = B for matrix B (n x nrhs) via FullPivLU.
+// Preconditions: A is n-by-n row-major, B is n-by-nrhs row-major, out is n-by-nrhs row-major.
+// Returns Success, NumericalIssue (if singular or non-finite solution), or InvalidInput.
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int solveLUMatrix(const double* a, const double* b, int n, int nrhs, double* out) {
+  if (a == nullptr || b == nullptr || out == nullptr || !validDim(n) || !validDim(nrhs)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::Map<const RowMajorMatrix> B(b, n, nrhs);
+  if (!A.allFinite() || !B.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::FullPivLU<RowMajorMatrix> lu(A);
+  if (!lu.isInvertible()) {
+    return Eigen::NumericalIssue;
+  }
+  RowMajorMatrix X = lu.solve(B);
+  if (!X.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  int total = n * nrhs;
+  for (int i = 0; i < total; ++i) {
+    out[i] = X.data()[i];
+  }
+  return Eigen::Success;
+}
+
 // Inverse of an n-by-n row-major matrix A, written to caller-allocated out buffer.
 // Returns Success, NumericalIssue (if singular or non-finite), or InvalidInput (null, out of range).
 // Leaves out untouched on failure.
@@ -384,6 +413,41 @@ int solveLeastSquares(const double* a, const double* b, int rows, int cols, doub
 
   for (int i = 0; i < cols; ++i) {
     x_out[i] = x[i];
+  }
+
+  return Eigen::Success;
+}
+
+// Least squares solver with multiple right-hand sides via HouseholderQR.
+// Solves min ||A * X - B|| for rectangular A (rows x cols) and B (rows x nrhs).
+// Solution X is written to x_out (cols x nrhs row-major).
+// Returns Success, NumericalIssue (if non-finite), or InvalidInput.
+// Leaves x_out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int solveLeastSquaresMatrix(const double* a, const double* b, int rows, int cols, int nrhs, double* x_out) {
+  if (a == nullptr || b == nullptr || x_out == nullptr || !validDim(rows, cols) || !validDim(nrhs)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  Eigen::Map<const RowMajorMatrix> B(b, rows, nrhs);
+  if (!A.allFinite() || !B.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::HouseholderQR<RowMajorMatrix> householderQr(A);
+  if (householderQr.info() != Eigen::Success) {
+    return householderQr.info();
+  }
+
+  RowMajorMatrix X = householderQr.solve(B);
+  if (!X.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+
+  int total = cols * nrhs;
+  for (int i = 0; i < total; ++i) {
+    x_out[i] = X.data()[i];
   }
 
   return Eigen::Success;

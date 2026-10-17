@@ -4,10 +4,10 @@
 
 **Blocked by:** 017
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implementar `solveLUMatrix(const double* a, const double* b, int n, int nrhs, double* out)` via FullPivLU
-- [ ] Implementar `solveLeastSquaresMatrix(const double* a, const double* b, int rows, int cols, int nrhs, double* x_out)` via HouseholderQR
-- [ ] Criar a suíte `wasm/test_matrix_solvers.js` adaptando casos multivariados de `test/lu.cpp` e `test/qr.cpp`
-- [ ] Validar preservação de sentinelas em falhas e rejeição para nrhs <= 0 ou dimensões fora de [1, 2048]
-- [ ] Teste passando 100% via Node.js
+- [x] Implementar `solveLUMatrix(const double* a, const double* b, int n, int nrhs, double* out)` via FullPivLU
+- [x] Implementar `solveLeastSquaresMatrix(const double* a, const double* b, int rows, int cols, int nrhs, double* x_out)` via HouseholderQR
+- [x] Criar a suíte `wasm/test_matrix_solvers.js` adaptando casos multivariados de `test/lu.cpp` e `test/qr.cpp`
+- [x] Validar preservação de sentinelas em falhas e rejeição para nrhs <= 0 ou dimensões fora de [1, 2048]
+- [x] Teste passando 100% via Node.js
