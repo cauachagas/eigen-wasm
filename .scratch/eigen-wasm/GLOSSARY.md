@@ -1,11 +1,7 @@
 # Glossary
 
-**Eigen WASM**: Build of Eigen C++ headers compiled to WebAssembly via Emscripten.
+The canonical glossary for this repository is [`GLOSSARY.md`](../../GLOSSARY.md) at the root. It was
+split out of this file when the engineering skills were set up, so that one vocabulary covers the whole
+repository rather than only the WebAssembly work.
 
-**matMul3x3**: Exported function computing `out = a * b` for row-major 3x3
-matrices passed as three `double` pointers.
-
-**Row-major**: Memory layout where element (i, j) of a 3x3 lives at index
-`3 * i + j`.
-
-**EXPORT_ES6**: Emscripten flag for ES module output.
+Read the root file. If a term here disagrees with it, the root file wins.
