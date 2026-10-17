@@ -82,8 +82,8 @@ Two of the cases in `test_matmul.js` pass `out` as an alias of `a` or `b`, which
 product into a temporary before storing into `out`, so it is pinned by a test rather
 than left as a comment.
 
-`.github/workflows/wasm.yml` runs both on GitHub Actions against the
-`emscripten/emsdk` image, on any change under `wasm/` or `Eigen/`. Eigen's own
+`.github/workflows/ci.yml` runs both on GitHub Actions against the
+`emscripten/emsdk` image, on any push or pull request to `main`. Eigen's own
 `.gitlab-ci.yml` is untouched.
 
 ## API

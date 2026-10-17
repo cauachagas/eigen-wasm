@@ -31,7 +31,7 @@ path = [
     ".git-blame-ignore-revs",
     ".gitattributes",
     ".gitignore",
-    ".github/workflows/wasm.yml",
+    ".github/workflows/ci.yml",
     ".gitlab/**",
     "GLOSSARY.md",
     "docs/agents/*.md",

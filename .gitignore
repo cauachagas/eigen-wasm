@@ -3,8 +3,6 @@ node_modules/
 
 # Build artifacts
 build/
-test/eigen_wasm.js
-test/eigen_wasm.wasm
 .eigen_cache/
 
 # OS and environment
