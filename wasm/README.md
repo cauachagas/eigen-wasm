@@ -116,6 +116,8 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 
 `wasm/` is the only local addition to this fork. `Eigen/`, `test/`, `ci/` and `.gitlab-ci.yml` are frozen upstream code, so the Eigen build system does not know this directory exists and the tests here run through GitHub Actions instead of `ctest`.
 
+`AGENTS.md` and the guides under `.agents/` govern this directory as they do the rest of the repository. This README adds the WebAssembly detail: where the two disagree, `AGENTS.md` wins.
+
 `build.sh` honours `SRC` and `OUT` from the environment; unset, it compiles
 `eigen_wasm.cpp` to `eigen_wasm.js` beside itself. The compiler is not
 configurable: it is always `em++`.

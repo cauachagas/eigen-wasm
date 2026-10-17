@@ -34,7 +34,7 @@ guides by default.
 | Editing `AGENTS.md` or a guide under `.agents/` | [`.agents/writing-guidance.md`](.agents/writing-guidance.md) |
 | Expression templates or evaluator internals | [`doc/TopicLazyEvaluation.dox`](doc/TopicLazyEvaluation.dox), [`doc/NewExpressionType.dox`](doc/NewExpressionType.dox), and [`doc/ClassHierarchy.dox`](doc/ClassHierarchy.dox) |
 
-The rules below describe the frozen upstream code. `wasm/` is the only local addition, and [`wasm/README.md`](wasm/README.md) governs work under it. Where this file and that README disagree, the README wins for work under `wasm/`.
+The rules below apply to the whole repository, including `wasm/`. `wasm/` is the only local addition, and [`wasm/README.md`](wasm/README.md) adds the detail for work under it. Where the two disagree, these rules win.
 
 The wording of a rule sets its strength:
 
