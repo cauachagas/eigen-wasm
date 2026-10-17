@@ -85,6 +85,17 @@ path = [
 SPDX-FileCopyrightText = "The Eigen Authors"
 SPDX-License-Identifier = "MPL-2.0"
 
+# Local agent guidance and scratch planning docs for the WebAssembly build.
+# Documentation, so inline SPDX tags would be noise.
+[[annotations]]
+path = [
+    "RULES.md",
+    ".scratch/eigen-wasm/*.md",
+    ".scratch/eigen-wasm/issues/*.md",
+]
+SPDX-FileCopyrightText = "The Eigen Authors"
+SPDX-License-Identifier = "MPL-2.0"
+
 # Other module/folder READMEs that don't carry per-file headers.
 [[annotations]]
 path = [

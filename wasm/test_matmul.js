@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: The Eigen Authors
+// SPDX-License-Identifier: MPL-2.0
+
 // Row-major 3x3 multiply over WASM memory: out = a * b, 9 doubles per matrix.
 // Expected values are hand-computed literals, not derived from the code under test.
 import assert from 'node:assert/strict';
