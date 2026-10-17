@@ -8,9 +8,9 @@ constrói: literal exato, independente de qualquer solver.
 
 **Blocked by:** 004
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Autovalores e autovetores devolvidos em buffers do chamador
-- [ ] Autovalores conferem contra as raízes conhecidas do polinômio de uma matriz companheira
-- [ ] Matriz não quadrada devolve `InvalidInput`
-- [ ] Cada autovetor confere contra o autovalor correspondente, por resíduo
+- [x] Autovalores e autovetores devolvidos em buffers do chamador
+- [x] Autovalores conferem contra as raízes conhecidas do polinômio de uma matriz companheira
+- [x] Matriz não quadrada devolve `InvalidInput`
+- [x] Cada autovetor confere contra o autovalor correspondente, por resíduo
