@@ -219,4 +219,31 @@ for (const [name, A_vals, rows, cols] of rejected) {
   }
 }
 
+// Contract tests for matMul dynamic dimensions
+{
+  const aPtr = alloc([1, 2, 3, 4]);
+  const bPtr = alloc([5, 6, 7, 8]);
+  const outPtr = Module._malloc(4 * 8);
+  Module.setValue(outPtr, SENTINEL, 'double');
+
+  try {
+    const infoNull = matMul(0, bPtr, 2, 2, 2, outPtr);
+    report('matMul null A pointer: InvalidInput', infoNull, INVALID_INPUT);
+    report('matMul null A pointer: output untouched', Module.getValue(outPtr, 'double') === SENTINEL, true);
+
+    const infoZero = matMul(aPtr, bPtr, 0, 2, 2, outPtr);
+    report('matMul zero rowsA: InvalidInput', infoZero, INVALID_INPUT);
+    report('matMul zero rowsA: output untouched', Module.getValue(outPtr, 'double') === SENTINEL, true);
+
+    const infoCeil = matMul(aPtr, bPtr, 2, MAX_DIMENSION + 1, 2, outPtr);
+    report('matMul colsA above ceiling: InvalidInput', infoCeil, INVALID_INPUT);
+    report('matMul colsA above ceiling: output untouched', Module.getValue(outPtr, 'double') === SENTINEL, true);
+  } finally {
+    Module._free(aPtr);
+    Module._free(bPtr);
+    Module._free(outPtr);
+  }
+}
+
+
 process.exit(failed ? 1 : 0);

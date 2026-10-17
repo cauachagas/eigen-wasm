@@ -59,3 +59,13 @@ Actions (.github/workflows/wasm.yml), mas a documentação e os scripts locais n
     • Priorizar a entrega de protótipos e testes em lotes consolidados no agente principal quando as dependências entre módulos C++
     forem compartilhadas no mesmo arquivo de tradução (wasm/eigen_wasm.cpp), reduzindo contenção de edição em um único arquivo de
     destino.
+
+──────
+### 5. Review Findings & Desvios Tratados (Gravidade: Média-Baixa)
+
+• Análise do Code-Review (.scratch/eigen-wasm/review.md):
+    • **Guarda de Dimensão Duplicada (Resolvido):** Criados helpers `validDim(d)` e `validDim(r, c)` centralizando o teto `kMaxDimension = 255` e `d >= 1`, eliminando redundância em 10 rotinas exportadas.
+    • **Tolerância de Simetria (Resolvido):** Criado helper `isSymmetric(a, n)` utilizando `std::max(1e-12, mag * 1e-6)` canônico do Eigen, evitando falsos positivos com números minúsculos.
+    • **Endurecimento de solveLU e inv (Resolvido):** Adicionada validação explícita `allFinite()` nas soluções e inversas para capturar matrizes quase-singulares que escapam de `isInvertible()`.
+    • **Validação de Limites em matMul (Resolvido):** `matMul` agora valida estritamente `validDim(rowsA)`, `validDim(colsA)` e `validDim(colsB)`, acompanhado de testes de contrato com sentinela em `test_qr.js`.
+    • **Inicialização de triangularView no QR (Falso Positivo Descartado):** O reviewer apontou risco de lixo de memória na atribuição de `triangularView<Eigen::Upper>()` para `RowMajorMatrix R`. O comportamento do Eigen avalia e zera explicitamente o triângulo oposto, comprovado experimentalmente para matrizes quadradas e retangulares ($3 \times 2$ e $2 \times 3$).
