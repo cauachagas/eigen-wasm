@@ -16,6 +16,7 @@ guides by default.
 
 | Work area | Additional guidance |
 |---|---|
+| Indexing, file discovery, and code navigation | [`RULES.md`](RULES.md) |
 | Any new or rewritten code | [`.agents/conventions.md`](.agents/conventions.md) |
 | Tests and CMake test targets | [`.agents/testing.md`](.agents/testing.md) |
 | Numerical kernels, decompositions, solvers, accuracy | [`.agents/numerics.md`](.agents/numerics.md) |
@@ -90,9 +91,9 @@ The wording of a rule sets its strength:
 1. Inspect `git status --short`, the current branch, and the diff. Separate pre-existing work from the requested change.
 2. As applicable, read the public header, implementation, nearby tests, registration in `CMakeLists.txt`, and relevant
    task guides before deciding on an implementation. Search with `rg` or `rg --files` (add `--hidden` to search
-   `.agents/`). Before writing a helper, check `numext`, `NumTraits`, `MathFunctions.h`, `Meta.h`, `XprHelper.h`, and
-   the `test/*_helpers.h` headers for an existing one. If one exists but lacks the hardening you need, fix it there
-   rather than adding a local copy.
+   `.agents/`), unless [`RULES.md`](RULES.md) directs discovery elsewhere. Before writing a helper, check `numext`,
+   `NumTraits`, `MathFunctions.h`, `Meta.h`, `XprHelper.h`, and the `test/*_helpers.h` headers for an existing one. If
+   one exists but lacks the hardening you need, fix it there rather than adding a local copy.
 3. Keep the patch within the owning module and established patterns. Avoid opportunistic refactors and churn in
    generated files or metadata.
 4. Add or update applicable tests and benchmarks in the same patch. Test public behavior through its umbrella header, so
