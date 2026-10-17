@@ -78,8 +78,8 @@ Caller-allocated buffers, as today. JS allocates through the exported `_malloc`,
 `ALLOW_MEMORY_GROWTH` detaches them on growth.
 
 Dynamic sizes, not fixed 3x3. Dimensions are parameters. `EIGEN_TEST_MAX_SIZE` in the Eigen
-test suite is 320, and the same ceiling applies here, so that the reference suite's cases are
-transferable.
+test suite is 320, and the ceiling this spec applies is 255 because 320 traps on this target. The
+reference suite's cases are transferable up to 255. See "Sizes" for the measurement.
 
 Verification in three layers, because no single layer covers everything:
 
@@ -197,8 +197,22 @@ forbidden because `ALLOW_MEMORY_GROWTH` detaches them when the heap grows.
 
 ### Sizes
 
-Dynamic, dimensions passed as parameters, maximum 320. The maximum is the Eigen test suite's
-`EIGEN_TEST_MAX_SIZE`, adopted so reference cases transfer without reinterpretation.
+Dynamic, dimensions passed as parameters, maximum 255. The Eigen test suite's `EIGEN_TEST_MAX_SIZE` is
+320, and 320 is the number this spec originally adopted so that reference cases would transfer without
+reinterpretation. Measurement on this target contradicts it. At dimension 256 and above, the blocked LU
+behind `determinant()` raises its block size from 16 to 32 and its nested panel update reads out of
+bounds. Reproduced across six matrix shapes, four decompositions and six optimisation levels;
+`INITIAL_MEMORY`, `STACK_SIZE` and address sanitisation do not change the boundary. 255 computes, 256
+traps every time.
+
+The ceiling is therefore 255, and it is enforced in the wrapper rather than in Eigen, which is frozen.
+What the guard buys is the difference between a call that is rejected and an instance that dies. A trap in
+WebAssembly is not a return value: it ends the module and leaves the caller's buffers in a state nobody
+reported. Every routine takes the same guard, so this one finding constrains all of them.
+
+The cost of the divergence is that reference cases sized between 256 and 320 cannot transfer directly. The
+practical effect is small, since the Eigen suite draws its sizes from a random source and rarely produces
+them, but the reason for deviating is recorded here rather than left to be rediscovered.
 
 ### Verification architecture
 
@@ -368,5 +382,5 @@ would remove the caller-visible allocation problem and the unbounded-growth haza
 `ALLOW_MEMORY_GROWTH` creates. That is a different API contract and was not decided here.
 
 The size figures were measured at fixed 3x3 instantiations. Dynamic-size instantiations will
-shift them, most likely upward, and were not measured. A build at the 320 ceiling is also
+shift them, most likely upward, and were not measured. A build at the dimension ceiling is also
 unmeasured and should be, before the size table is quoted as a budget.

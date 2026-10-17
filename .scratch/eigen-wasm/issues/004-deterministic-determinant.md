@@ -11,16 +11,20 @@ garantia.
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] O determinante de uma matriz n por n dinâmico é devolvido num buffer do chamador
-- [ ] Ponteiro nulo, dimensão zero e dimensão negativa devolvem `InvalidInput`
-- [ ] Matriz não-quadrada para uma rotina quadrada devolve `InvalidInput`
-- [ ] Uma rotina que não devolve `Success` não escreveu no buffer de saída, verificado por
+- [x] O determinante de uma matriz n por n dinâmico é devolvido num buffer do chamador
+- [x] Ponteiro nulo, dimensão zero e dimensão negativa devolvem `InvalidInput`
+- [x] Matriz não-quadrada para uma rotina quadrada devolve `InvalidInput`
+- [x] Uma rotina que não devolve `Success` não escreveu no buffer de saída, verificado por
       buffer pré-preenchido com valor sentinela
-- [ ] O código de retorno é `ComputationInfo` do Eigen verbatim, sem mapeamento, e os
+- [x] O código de retorno é `ComputationInfo` do Eigen verbatim, sem mapeamento, e os
       quatro valores estão nomeados no glossário
-- [ ] Casos de mão para 1x1, 2x2 e 3x3 com literais escritos à mão, não recalculados
-- [ ] A guarda é código explícito, não `eigen_assert`, porque `-O3` compila assertions fora
-- [ ] O produto 3x3 passa os testes atuais sem modificação
-- [ ] Uma implementação mutante da rotina faz o teste ir a vermelho
+- [x] Casos de mão para 1x1, 2x2 e 3x3 com literais escritos à mão, não recalculados
+- [x] A guarda é código explícito, não `eigen_assert`, porque `-O3` compila assertions fora
+- [x] O produto 3x3 passa os testes atuais sem modificação
+- [x] Uma implementação mutante da rotina faz o teste ir a vermelho
+
+**Notes:** The dimension ceiling was specified as 320 and measured at 255. At 256 the blocked LU behind
+`determinant()` reads out of bounds and kills the instance; verified by building without the guard and
+observing a trap rather than a return. `spec-dense.md` records the measurement and the reason.
