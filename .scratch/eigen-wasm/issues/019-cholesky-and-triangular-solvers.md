@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implementar `solveCholesky(const double* a, const double* b, int n, double* out)` com checagens de simetria e positiva-definida
-- [ ] Implementar `solveTriangularLower(const double* l, const double* b, int n, bool unit_diag, double* out)`
-- [ ] Implementar `solveTriangularUpper(const double* u, const double* b, int n, bool unit_diag, double* out)`
-- [ ] Criar a suíte `wasm/test_dense_solvers.js` adaptando casos de teste de `test/cholesky.cpp` e `test/triangular.cpp`
-- [ ] Validar preservação de sentinelas em falhas e rejeição de entradas inválidas
-- [ ] Teste passando 100% via Node.js
+- [x] Implementar `solveCholesky(const double* a, const double* b, int n, double* out)` com checagens de simetria e positiva-definida
+- [x] Implementar `solveTriangularLower(const double* l, const double* b, int n, bool unit_diag, double* out)`
+- [x] Implementar `solveTriangularUpper(const double* u, const double* b, int n, bool unit_diag, double* out)`
+- [x] Criar a suíte `wasm/test_dense_solvers.js` adaptando casos de teste de `test/cholesky.cpp` e `test/triangular.cpp`
+- [x] Validar preservação de sentinelas em falhas e rejeição de entradas inválidas
+- [x] Teste passando 100% via Node.js

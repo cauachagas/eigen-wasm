@@ -217,6 +217,108 @@ int cholesky(const double* a, int n, double* out) {
   return Eigen::Success;
 }
 
+// Solve linear system A x = b for symmetric positive-definite matrix via LLT.
+// Preconditions: A is n-by-n symmetric positive-definite, b is n-vector, out is caller-allocated n-vector.
+// Returns Success, NumericalIssue (if non-positive definite or non-finite solution), or InvalidInput (asymmetric, null, bounds).
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int solveCholesky(const double* a, const double* b, int n, double* out) {
+  if (a == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  if (!isSymmetric(a, n)) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!A.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::LLT<RowMajorMatrix> llt(A);
+  if (llt.info() != Eigen::Success) {
+    return llt.info();
+  }
+  Eigen::VectorXd x = llt.solve(rhs);
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
+// Solve lower triangular system L x = b.
+// unit_diag != 0 implies unit lower triangular (diagonal entries assumed to be 1.0).
+EMSCRIPTEN_KEEPALIVE
+int solveTriangularLower(const double* l, const double* b, int n, int unit_diag, double* out) {
+  if (l == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> L(l, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!L.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  if (unit_diag == 0) {
+    if (L.diagonal().cwiseAbs().minCoeff() == 0.0) {
+      return Eigen::NumericalIssue;
+    }
+  }
+
+  Eigen::VectorXd x(n);
+  if (unit_diag != 0) {
+    x = L.template triangularView<Eigen::UnitLower>().solve(rhs);
+  } else {
+    x = L.template triangularView<Eigen::Lower>().solve(rhs);
+  }
+
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
+// Solve upper triangular system U x = b.
+// unit_diag != 0 implies unit upper triangular (diagonal entries assumed to be 1.0).
+EMSCRIPTEN_KEEPALIVE
+int solveTriangularUpper(const double* u, const double* b, int n, int unit_diag, double* out) {
+  if (u == nullptr || b == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> U(u, n, n);
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  if (!U.allFinite() || !rhs.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  if (unit_diag == 0) {
+    if (U.diagonal().cwiseAbs().minCoeff() == 0.0) {
+      return Eigen::NumericalIssue;
+    }
+  }
+
+  Eigen::VectorXd x(n);
+  if (unit_diag != 0) {
+    x = U.template triangularView<Eigen::UnitUpper>().solve(rhs);
+  } else {
+    x = U.template triangularView<Eigen::Upper>().solve(rhs);
+  }
+
+  if (!x.allFinite()) {
+    return Eigen::NumericalIssue;
+  }
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
 
 // QR factorization via HouseholderQR.
 // Produces full Q (rows x rows) and strictly upper triangular R (rows x cols).
