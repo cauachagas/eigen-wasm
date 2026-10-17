@@ -60,9 +60,10 @@ void matMul3x3(const double* a, const double* b, double* out);   // out = a * b
 `a`, `b`, and `out` must each point to 9 doubles in row-major order, where
 `a[3 * i + j]` is row `i`, column `j`. `out` may alias `a` or `b`.
 
-The module is `MODULARIZE`d and exported as `EigenWasmModule`, with
-`_malloc`, `_free`, and the `ccall`, `cwrap`, `setValue`, and `getValue` runtime
-methods available:
+The module is `MODULARIZE`d and exported as `EigenWasmModule`, with `_malloc`,
+`_free`, and the `ccall`, `cwrap`, `setValue`, and `getValue` runtime methods
+available. [`example.js`](example.js) is a complete worked example; run it with
+`node wasm/example.js`:
 
 ```js
 import EigenWasmModule from './wasm/eigen_wasm.js';
@@ -93,6 +94,10 @@ Module._free(outPtr);
 console.log(result);   // [30,24,18,84,69,54,138,114,90]
 ```
 
+`test_matmul.js` imports `multiply3x3` from `example.js` and runs it, so this code is
+executed rather than only read. It has rotted before: the version that lacked the
+`_free` calls looked fine and leaked on every call.
+
 Use `setValue` and `getValue` rather than a `Module.HEAPF64` view. The build sets
 `ALLOW_MEMORY_GROWTH`, which detaches typed-array views when the heap grows, so a
 retained view silently reads stale memory.
@@ -106,7 +111,10 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 |---|---|
 | `build.sh` | `em++` invocation and output paths |
 | `eigen_wasm.cpp` | `matMul3x3` wrapper over `Eigen::Map` |
+| `example.js` | Worked example; imported and run by the tests |
 | `test_matmul.js` | Table-driven tests over the exported function |
+
+`wasm/` is the only local addition to this fork. `Eigen/`, `test/`, `ci/` and `.gitlab-ci.yml` are frozen upstream code, so the Eigen build system does not know this directory exists and the tests here run through GitHub Actions instead of `ctest`.
 
 `build.sh` honours `SRC` and `OUT` from the environment; unset, it compiles
 `eigen_wasm.cpp` to `eigen_wasm.js` beside itself. The compiler is not

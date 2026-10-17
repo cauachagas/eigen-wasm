@@ -26,12 +26,15 @@ guides by default.
 | Packet math, CUDA, HIP, SYCL, `contrib/Eigen/GPU` | [`.agents/simd-gpu.md`](.agents/simd-gpu.md) |
 | Tensor, ThreadPool, and multithreading | [`.agents/tensor-threadpool.md`](.agents/tensor-threadpool.md) |
 | Formatting, lint, and GitLab CI | [`.agents/ci.md`](.agents/ci.md) |
+| The WebAssembly build under `wasm/` | [`wasm/README.md`](wasm/README.md) |
 | Doxygen blocks, `doc/` pages, snippets, and examples | [`.agents/docs.md`](.agents/docs.md) |
 | Changes under `ci/`, `.gitlab-ci.yml`, or the test-selection and cache scripts | [`.agents/ci-internals.md`](.agents/ci-internals.md) |
 | Writing or updating a merge request description | [`.agents/merge-requests.md`](.agents/merge-requests.md) |
 | Answering merge request review comments | [`.agents/review-response.md`](.agents/review-response.md) |
 | Editing `AGENTS.md` or a guide under `.agents/` | [`.agents/writing-guidance.md`](.agents/writing-guidance.md) |
 | Expression templates or evaluator internals | [`doc/TopicLazyEvaluation.dox`](doc/TopicLazyEvaluation.dox), [`doc/NewExpressionType.dox`](doc/NewExpressionType.dox), and [`doc/ClassHierarchy.dox`](doc/ClassHierarchy.dox) |
+
+The rules below describe the frozen upstream code. `wasm/` is the only local addition, and [`wasm/README.md`](wasm/README.md) governs work under it. Where this file and that README disagree, the README wins for work under `wasm/`.
 
 The wording of a rule sets its strength:
 
@@ -117,7 +120,11 @@ Eigen is a header-only expression-template library. Consumers include module hea
 `contrib/Eigen/`. The top-level CMake project builds tests, documentation, demos, and BLAS/LAPACK shims rather than
 a core Eigen library; benchmarks use separate CMake projects. `Eigen/Dense` aggregates the dense modules, while
 `Eigen/Eigen` includes `Dense` and `Sparse`. External backend support modules and `Eigen/ThreadPool` remain separate
-includes. The upstream project is on GitLab; its GitHub repository is a read-only mirror.
+includes. The upstream project is on GitLab at `gitlab.com/libeigen/eigen`, which this repository tracks as `upstream`.
+
+This repository is the `cauachagas/eigen-wasm` fork on GitHub, and it is where changes are made.
+
+`Eigen/`, `contrib/Eigen/`, `unsupported/Eigen/`, `test/`, `ci/`, and `.gitlab-ci.yml` are frozen upstream code. Do not edit them.
 
 The supported implementation is under `Eigen/src/`; tests are under `test/`. Modules with looser API-stability
 guarantees are under `contrib/Eigen/`, with tests under `contrib/test/`. Legacy `unsupported/Eigen/...` include paths
