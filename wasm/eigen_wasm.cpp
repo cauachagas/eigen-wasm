@@ -74,6 +74,66 @@ int determinant(const double* a, int rows, int cols, double* out) {
   return Eigen::Success;
 }
 
+// In-memory matrix transpose for rows-by-cols matrix into cols-by-rows buffer out.
+EMSCRIPTEN_KEEPALIVE
+int transpose(const double* a, int rows, int cols, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  RowMajorMatrix At = A.transpose();
+  int total = cols * rows;
+  for (int i = 0; i < total; ++i) {
+    out[i] = At.data()[i];
+  }
+  return Eigen::Success;
+}
+
+// Trace of a square matrix of size n x n.
+EMSCRIPTEN_KEEPALIVE
+int trace(const double* a, int n, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(n)) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+  *out = A.trace();
+  return Eigen::Success;
+}
+
+// Matrix norms:
+// norm_type = 0: Frobenius norm
+// norm_type = 1: 1-norm (maximum absolute column sum)
+// norm_type = 2: Infinity-norm (maximum absolute row sum)
+EMSCRIPTEN_KEEPALIVE
+int matrixNorm(const double* a, int rows, int cols, int norm_type, double* out) {
+  if (a == nullptr || out == nullptr || !validDim(rows, cols)) {
+    return Eigen::InvalidInput;
+  }
+  if (norm_type < 0 || norm_type > 2) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  if (norm_type == 0) {
+    *out = A.norm();
+  } else if (norm_type == 1) {
+    *out = A.cwiseAbs().colwise().sum().maxCoeff();
+  } else if (norm_type == 2) {
+    *out = A.cwiseAbs().rowwise().sum().maxCoeff();
+  }
+
+  return Eigen::Success;
+}
+
 // Solve linear system A x = b via FullPivLU.
 // Preconditions: A is n-by-n row-major, b is n-vector, out is caller-allocated n-vector.
 // Returns Success, NumericalIssue (if singular or non-finite solution), or InvalidInput.

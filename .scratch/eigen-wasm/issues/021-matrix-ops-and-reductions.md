@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Implementar `transpose(const double* a, int rows, int cols, double* out)` com guardas `validDim(rows, cols)`
-- [ ] Implementar `trace(const double* a, int n, double* out)` com guardas `validDim(n)`
-- [ ] Implementar `matrixNorm(const double* a, int rows, int cols, int norm_type, double* out)` onde norm_type suporta Frobenius (0), 1-norm (1) e inf-norm (2)
-- [ ] Criar a suíte `wasm/test_matrix_ops.js` adaptando matrizes de teste de `test/matrix.cpp`
-- [ ] Validar preservação de sentinelas em falhas e rejeição de entradas inválidas
-- [ ] Teste passando 100% via Node.js
+- [x] Implementar `transpose(const double* a, int rows, int cols, double* out)` com guardas `validDim(rows, cols)`
+- [x] Implementar `trace(const double* a, int n, double* out)` com guardas `validDim(n)`
+- [x] Implementar `matrixNorm(const double* a, int rows, int cols, int norm_type, double* out)` onde norm_type suporta Frobenius (0), 1-norm (1) e inf-norm (2)
+- [x] Criar a suíte `wasm/test_matrix_ops.js` adaptando matrizes de teste de `test/matrix.cpp`
+- [x] Validar preservação de sentinelas em falhas e rejeição de entradas inválidas
+- [x] Teste passando 100% via Node.js
