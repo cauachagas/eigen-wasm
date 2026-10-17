@@ -1,0 +1,67 @@
+qrc_*cxx
+*.orig
+*.pyc
+*.diff
+diff
+*.save
+save
+*.old
+*.gmo
+*.qm
+core
+core.*
+# Keep the benchmark source directory visible on case-insensitive filesystems.
+!benchmarks/Core/
+*.bak
+*~
+*.build*
+# Keep the build-system test job's script, whose name matches the rule above.
+!ci/scripts/test.buildsystem.script.sh
+.tidy-build/
+*.moc.*
+*.moc
+ui_*
+CMakeCache.txt
+tags
+.*.swp
+activity.png
+*.out
+*.php*
+*.log
+*.orig
+*.rej
+log
+patch
+*.patch
+a
+a.*
+lapack/testing
+lapack/reference
+.*project
+.settings
+Makefile
+!ci/build.gitlab-ci.yml
+!scripts/buildtests.in
+!Eigen/Core
+!Eigen/src/Core
+CLAUDE.md
+.claude/*
+!.claude/settings.json
+.DS_Store
+.ccache/
+.ccache-bin/
+.sccache-bin/
+.sccache/
+.temp/
+ccache-stats.log
+.cred_port
+# Written by ci/lint/lint.sh.
+lint-report.xml
+graphify-out/
+.agents/skills/
+skills-lock.json
+
+# Emscripten build output: wasm/build.sh regenerates these beside the sources.
+# Named explicitly so the hand-written test_matmul.js stays trackable.
+/wasm/eigen_wasm.js
+/wasm/eigen_wasm.wasm
