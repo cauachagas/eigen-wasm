@@ -35,7 +35,17 @@ its own failure condition: a singular A has no unique solution.
 **Spectral decomposition**: A factorization producing both values and vectors. Singular values with U
 and V for SVD; eigenvalues with eigenvectors for the eigensolvers.
 
-**Reduction**: A computation whose output is a scalar or a short vector, such as determinant or rank.
+**Complete Orthogonal Decomposition**: A rank-revealing factorization `A * P = Q * [T 0] * Z` where Q
+and Z are orthogonal and T is upper triangular/trapezoidal, used for rank-deficient least-squares and
+robust Moore-Penrose pseudoinversion.
+
+**PartialPivLU**: A high-performance LU factorization with partial row pivoting (equivalent to LAPACK DGETRF),
+computing `P * A = L * U` in O(n^3) with cache locality, distinct from the slower FullPivLU.
+
+**Pseudoinverse**: The Moore-Penrose pseudoinverse `A^+` satisfying the four Penrose equations, computed
+in WASM via Complete Orthogonal Decomposition.
+
+**Reduction**: A computation whose output is a scalar or a short vector, such as determinant, trace, or norm.
 Cannot fail the way a factorization can.
 
 ## Contract

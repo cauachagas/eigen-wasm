@@ -37,13 +37,18 @@ to touch no libstdc++ symbol, but any Eigen decomposition needs
 ```bash
 node wasm/test_matmul.js
 node wasm/test_determinant.js
+node wasm/test_matrix_ops.js
 node wasm/test_lu.js
+node wasm/test_partial_lu.js
 node wasm/test_cholesky.js
+node wasm/test_dense_solvers.js
 node wasm/test_qr.js
+node wasm/test_matrix_solvers.js
 node wasm/test_svd.js
 node wasm/test_eigen.js
 node wasm/test_ldlt.js
 node wasm/test_colpiv_qr.js
+node wasm/test_cod.js
 node wasm/test_bdc_svd.js
 node wasm/test_general_eigen.js
 ```
@@ -71,21 +76,31 @@ than left as a comment.
 
 ## API
 
-The module exports 19 C routines declared with `EMSCRIPTEN_KEEPALIVE` and `extern "C"`:
+The module exports 31 C routines declared with `EMSCRIPTEN_KEEPALIVE` and `extern "C"`:
 
 ```c
 // System & Configuration
 int  maxDimension();
 
-// Matrix Multiplication
+// Matrix Multiplication & Basic Operations
 void matMul3x3(const double* a, const double* b, double* out);
 int  matMul(const double* a, const double* b, int rowsA, int colsA, int colsB, double* out);
+int  transpose(const double* a, int rows, int cols, double* out);
+int  trace(const double* a, int n, double* out);
+int  matrixNorm(const double* a, int rows, int cols, int norm_type, double* out);
 
 // Determinant, Inversion & Linear Systems
 int  determinant(const double* a, int rows, int cols, double* out);
 int  solveLU(const double* a, const double* b, int n, double* out);
+int  solveLUMatrix(const double* a, const double* b, int n, int nrhs, double* out);
 int  inv(const double* a, int n, double* out);
+int  solvePartialLU(const double* a, const double* b, int n, double* out);
+int  invPartialLU(const double* a, int n, double* out);
+int  solveCholesky(const double* a, const double* b, int n, double* out);
+int  solveTriangularLower(const double* l, const double* b, int n, int unit_diag, double* out);
+int  solveTriangularUpper(const double* u, const double* b, int n, int unit_diag, double* out);
 int  solveLeastSquares(const double* a, const double* b, int rows, int cols, double* x_out);
+int  solveLeastSquaresMatrix(const double* a, const double* b, int rows, int cols, int nrhs, double* x_out);
 
 // Factorizations & Decompositions
 int  cholesky(const double* a, int n, double* out);
@@ -93,7 +108,9 @@ int  ldlt(const double* a, int n, double* l_out, double* d_out, int* trans_out);
 int  bunchKaufman(const double* a, int n, double* recon_out);
 int  qr(const double* a, int rows, int cols, double* q_out, double* r_out);
 int  colPivQr(const double* a, int rows, int cols, double* q_out, double* r_out, int* perm_out, int* rank_out);
+int  cod(const double* a, int rows, int cols, double* q_out, double* t_out, double* z_out, int* perm_out, int* rank_out);
 int  rank(const double* a, int rows, int cols, int* rank_out);
+int  pseudoInverse(const double* a, int rows, int cols, double* pinv_out);
 
 // Singular Value Decomposition & Generation
 int  svd(const double* a, int rows, int cols, double* s_out, double* u_out, double* vt_out);
@@ -124,17 +141,27 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
 
 - `maxDimension()`: Returns the dimension ceiling (`2048`).
 
-#### Matrix Multiplication
+#### Matrix Multiplication & Basic Operations
 
 - `matMul3x3(a, b, out)`: Computes fixed 3x3 matrix product `out = a * b`. `a`, `b`, and `out` each point to 9 doubles in row-major order. `out` may alias `a` or `b`.
 - `matMul(a, b, rowsA, colsA, colsB, out)`: Dynamic matrix multiplication `out = a * b`. `a` points to `rowsA * colsA` doubles, `b` to `colsA * colsB` doubles, and `out` to `rowsA * colsB` doubles (row-major). Returns `Success` (0) or `InvalidInput` (3).
+- `transpose(a, rows, cols, out)`: Transpose of `rows x cols` matrix `a`, written to `out` (`cols * rows` doubles row-major). Returns `Success` or `InvalidInput`.
+- `trace(a, n, out)`: Trace (sum of diagonal entries) of square `n x n` matrix `a`, written to `out` (1 double). Returns `Success` or `InvalidInput`.
+- `matrixNorm(a, rows, cols, norm_type, out)`: Matrix norm of `rows x cols` matrix `a` (`norm_type`: 0 for Frobenius norm, 1 for 1-norm / maximum absolute column sum, 2 for Infinity-norm / maximum absolute row sum), written to `out` (1 double). Returns `Success` or `InvalidInput`.
 
 #### Determinant, Inversion & Linear Systems
 
 - `determinant(a, rows, cols, out)`: Determinant of square matrix `a` (`rows == cols`), written to `out` (1 double). A singular matrix returns `Success` with `0.0`. Returns `Success` or `InvalidInput`.
 - `solveLU(a, b, n, out)`: Solves linear system `A * x = b` via FullPivLU for `n x n` matrix `a` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (singular or non-finite solution), or `InvalidInput`.
+- `solveLUMatrix(a, b, n, nrhs, out)`: Solves multiple right-hand sides `A * X = B` via FullPivLU for `n x n` matrix `a` and `n x nrhs` matrix `b`. Solution written to `out` (`n * nrhs` doubles row-major). Returns `Success`, `NumericalIssue` (singular or non-finite solution), or `InvalidInput`.
 - `inv(a, n, out)`: Matrix inverse of `n x n` matrix `a` via FullPivLU, written to `out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue` (singular or non-finite inverse), or `InvalidInput`.
+- `solvePartialLU(a, b, n, out)`: Solves linear system `A * x = b` via PartialPivLU (with partial row pivoting) for `n x n` matrix `a` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (singular or non-finite solution), or `InvalidInput`.
+- `invPartialLU(a, n, out)`: Matrix inverse of `n x n` matrix `a` via PartialPivLU, written to `out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue` (singular or non-finite inverse), or `InvalidInput`.
+- `solveCholesky(a, b, n, out)`: Solves linear system `A * x = b` via LLT Cholesky factorization for symmetric positive-definite `n x n` matrix `a` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (non-positive-definite or non-finite solution), or `InvalidInput`.
+- `solveTriangularLower(l, b, n, unit_diag, out)`: Solves lower triangular system `L * x = b` (`unit_diag = 0` for explicit diagonal, `1` for unit diagonal with assumed 1s) for `n x n` matrix `l` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (singular/zero diagonal or non-finite), or `InvalidInput`.
+- `solveTriangularUpper(u, b, n, unit_diag, out)`: Solves upper triangular system `U * x = b` (`unit_diag = 0` for explicit diagonal, `1` for unit diagonal with assumed 1s) for `n x n` matrix `u` and `n`-vector `b`. Solution written to `out` (`n` doubles). Returns `Success`, `NumericalIssue` (singular/zero diagonal or non-finite), or `InvalidInput`.
 - `solveLeastSquares(a, b, rows, cols, x_out)`: Solves least-squares problem minimizing `||A * x - b||` via HouseholderQR for `rows x cols` matrix `a` and `rows`-vector `b`. Solution written to `x_out` (`cols` doubles). Returns `Success`, `NumericalIssue` (non-finite solution), or `InvalidInput`.
+- `solveLeastSquaresMatrix(a, b, rows, cols, nrhs, x_out)`: Solves multiple right-hand sides least-squares problem minimizing `||A * X - B||` via HouseholderQR for `rows x cols` matrix `a` and `rows x nrhs` matrix `b`. Solution written to `x_out` (`cols * nrhs` doubles row-major). Returns `Success`, `NumericalIssue` (non-finite solution), or `InvalidInput`.
 
 #### Factorizations & Decompositions
 
@@ -143,7 +170,9 @@ int  generalEigen(const double* a, int n, double* real_eivals, double* imag_eiva
 - `bunchKaufman(a, n, recon_out)`: Bunch-Kaufman decomposition for symmetric indefinite `n x n` matrix `a`. Reconstructed matrix written to `recon_out` (`n * n` doubles row-major). Returns `Success`, `NumericalIssue`, or `InvalidInput`.
 - `qr(a, rows, cols, q_out, r_out)`: Householder QR factorization (`A = Q * R`). Full orthogonal `Q` written to `q_out` (`rows * rows` doubles row-major); upper-triangular `R` written to `r_out` (`rows * cols` doubles row-major, lower triangle explicitly zeroed). Returns `Success` or `InvalidInput`.
 - `colPivQr(a, rows, cols, q_out, r_out, perm_out, rank_out)`: Column-pivoting Householder QR (`A * P = Q * R`) with rank detection. Full `Q` written to `q_out` (`rows * rows` doubles), upper-triangular `R` written to `r_out` (`rows * cols` doubles, lower triangle zeroed), column permutation indices written to `perm_out` (`cols` ints), numerical rank written to `rank_out` (1 int). Returns `Success` or `InvalidInput`.
+- `cod(a, rows, cols, q_out, t_out, z_out, perm_out, rank_out)`: Complete Orthogonal Decomposition (`A * P = Q * [T 0] * Z`) with complete rank revealing. Full `Q` written to `q_out` (`rows * rows` doubles), upper-trapezoidal `T` written to `t_out` (`rows * cols` doubles), full `Z` written to `z_out` (`cols * cols` doubles), column permutation indices written to `perm_out` (`cols` ints), numerical rank written to `rank_out` (1 int). Returns `Success` or `InvalidInput`.
 - `rank(a, rows, cols, rank_out)`: Standalone matrix rank computation via ColPivHouseholderQR. Numerical rank written to `rank_out` (1 int). Returns `Success` or `InvalidInput`.
+- `pseudoInverse(a, rows, cols, pinv_out)`: Moore-Penrose pseudoinverse via CompleteOrthogonalDecomposition for `rows x cols` matrix `a`. Pseudoinverse written to `pinv_out` (`cols * rows` doubles row-major). Returns `Success` or `InvalidInput`.
 
 #### Singular Value Decomposition & Generation
 
