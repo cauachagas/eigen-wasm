@@ -9,13 +9,17 @@ não pode ser reduzido por um erro no próprio solver.
 
 **Blocked by:** 004
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `solveLU` resolve `A x = b` num buffer do chamador
-- [ ] `inv` escreve a inversa num buffer do chamador
-- [ ] Resíduo `norma de A x menos b` exportado e abaixo do limiar relativo
-- [ ] Matriz singular devolve `NumericalIssue`, e o buffer de saída permanece intocado
-- [ ] Sistema retangular fornecido a `inv` devolve `InvalidInput`
-- [ ] A comparação relativa do Eigen levada para a verificação em JS: uma diferença
+- [x] `solveLU` resolve `A x = b` num buffer do chamador
+- [x] `inv` escreve a inversa num buffer do chamador
+- [x] Resíduo `norma de A x menos b` exportado e abaixo do limiar relativo
+- [x] Matriz singular devolve `NumericalIssue`, e o buffer de saída permanece intocado
+- [x] Sistema retangular fornecido a `inv` devolve `InvalidInput`
+- [x] A comparação relativa do Eigen levada para a verificação em JS: uma diferença
       passa quando é no máximo a menor das duas magnitudes vezes a precisão, e falha
       quando qualquer operando não é finito
+
+**Notes:** Verified via residual norms (||A x - b|| and ||A * inv(A) - I||) using FullPivLU.
+Tested across 1x1, 2x2, 3x3 hand-computed systems, singular systems reporting NumericalIssue
+with untouched buffers, and boundary/precondition tests reporting InvalidInput.

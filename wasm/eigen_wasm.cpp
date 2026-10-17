@@ -49,4 +49,47 @@ int determinant(const double* a, int rows, int cols, double* out) {
   *out = Eigen::Map<const RowMajorMatrix>(a, rows, cols).determinant();
   return Eigen::Success;
 }
+
+// Solve linear system A x = b via FullPivLU.
+// Preconditions: A is n-by-n row-major, b is n-vector, out is caller-allocated n-vector.
+// Returns Success, NumericalIssue (if singular), or InvalidInput.
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int solveLU(const double* a, const double* b, int n, double* out) {
+  if (a == nullptr || b == nullptr || out == nullptr || n < 1 || n > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::FullPivLU<RowMajorMatrix> lu(A);
+  if (!lu.isInvertible()) {
+    return Eigen::NumericalIssue;
+  }
+  Eigen::Map<const Eigen::VectorXd> rhs(b, n);
+  Eigen::VectorXd x = lu.solve(rhs);
+  for (int i = 0; i < n; ++i) {
+    out[i] = x[i];
+  }
+  return Eigen::Success;
+}
+
+// Inverse of an n-by-n row-major matrix A, written to caller-allocated out buffer.
+// Returns Success, NumericalIssue (if singular), or InvalidInput (non-square, null, out of range).
+// Leaves out untouched on failure.
+EMSCRIPTEN_KEEPALIVE
+int inv(const double* a, int rows, int cols, double* out) {
+  if (a == nullptr || out == nullptr || rows < 1 || cols < 1 || rows != cols || rows > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  Eigen::FullPivLU<RowMajorMatrix> lu(A);
+  if (!lu.isInvertible()) {
+    return Eigen::NumericalIssue;
+  }
+  RowMajorMatrix inverseMat = lu.inverse();
+  int totalEntries = rows * cols;
+  for (int i = 0; i < totalEntries; ++i) {
+    out[i] = inverseMat.data()[i];
+  }
+  return Eigen::Success;
+}
 }

@@ -44,3 +44,6 @@ jobs:
 
       - name: Test determinant
         run: node wasm/test_determinant.js
+
+      - name: Test LU and inverse
+        run: node wasm/test_lu.js
