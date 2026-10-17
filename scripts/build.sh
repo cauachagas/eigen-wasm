@@ -65,8 +65,11 @@ em++ "$SRC" -o "$OUT" \
   -s EXPORT_ES6=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="EigenWasmModule" \
-  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_transpose","_trace","_matrixNorm","_solveLU","_solveLUMatrix","_inv","_solvePartialLU","_invPartialLU","_cholesky","_solveCholesky","_solveTriangularLower","_solveTriangularUpper","_qr","_solveLeastSquares","_solveLeastSquaresMatrix","_matMul","_svd","_svdSingularValues","_symmetricEigen","_ldlt","_bunchKaufman","_colPivQr","_rank","_cod","_pseudoInverse","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free","_sparseFromTriplets","_sparseMatMulVec","_sparseMatMulDense","_sparseAddGetNnz","_sparseAdd","_sparseScale","_sparseTranspose"]' \
+  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_transpose","_trace","_matrixNorm","_solveLU","_solveLUMatrix","_inv","_solvePartialLU","_invPartialLU","_cholesky","_solveCholesky","_solveTriangularLower","_solveTriangularUpper","_qr","_solveLeastSquares","_solveLeastSquaresMatrix","_matMul","_svd","_svdSingularValues","_symmetricEigen","_ldlt","_bunchKaufman","_colPivQr","_rank","_cod","_pseudoInverse","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free","_sparseFromTriplets","_sparseMatMulVec","_sparseMatMulDense","_sparseAddGetNnz","_sparseAdd","_sparseScale","_sparseTranspose","_sparseCholeskyFactorize","_sparseCholeskyDestroy","_sparseCholeskySolve","_sparseConjugateGradient","_sparseBiCGSTAB"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","setValue","getValue"]' \
   -std=c++17
 
 echo "Build complete: $OUT"
+cp "$BUILD_DIR/eigen_wasm.js" "$ROOT/test/eigen_wasm.js"
+cp "$BUILD_DIR/eigen_wasm.wasm" "$ROOT/test/eigen_wasm.wasm"
+

@@ -8,7 +8,11 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <memory>
+#include <unordered_map>
 #include "Eigen/Sparse"
+#include "Eigen/SparseCholesky"
+#include "Eigen/IterativeLinearSolvers"
 
 // Dimension ceiling for sparse routines: 1,000,000 rows/cols and 10,000,000 non-zeros.
 // Up to 4GB linear memory permits scaling far beyond dense limits while protecting against overflow.
@@ -96,6 +100,101 @@ static inline void copyCompressedSparse(
   for (int i = 0; i < outerSize; ++i) {
     outOuterStarts[i] = outerPtr[i];
   }
+}
+
+// --- Sparse Solver Instance Registry ---
+
+enum CholeskySolverType {
+  SolverSimplicialLDLT = 0,
+  SolverSimplicialLLT = 1
+};
+
+class SparseSolverInstance {
+public:
+  virtual ~SparseSolverInstance() = default;
+  virtual int solve(const double* b, int nrhs, double* outX) = 0;
+  virtual int dimension() const = 0;
+};
+
+template <typename ConcreteSolver>
+class SimplicialCholeskySolverInstance : public SparseSolverInstance {
+  int n_;
+  ConcreteSolver solver_;
+public:
+  template <typename MatrixType>
+  SimplicialCholeskySolverInstance(int n, const MatrixType& mat) : n_(n), solver_(mat) {}
+  bool isOk() const { return solver_.info() == Eigen::Success; }
+  int dimension() const override { return n_; }
+  int solve(const double* b, int nrhs, double* outX) override {
+    if (solver_.info() != Eigen::Success) return Eigen::NumericalIssue;
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> B(b, n_, nrhs);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> X = solver_.solve(B);
+    if (solver_.info() != Eigen::Success || !X.allFinite()) return Eigen::NumericalIssue;
+    std::copy(X.data(), X.data() + (n_ * nrhs), outX);
+    return Eigen::Success;
+  }
+};
+
+using SimplicialLDLTSolverInstance = SimplicialCholeskySolverInstance<
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double, Eigen::ColMajor, int>>>;
+using SimplicialLLTSolverInstance = SimplicialCholeskySolverInstance<
+    Eigen::SimplicialLLT<Eigen::SparseMatrix<double, Eigen::ColMajor, int>>>;
+
+static std::unordered_map<int32_t, std::unique_ptr<SparseSolverInstance>> g_sparseSolverRegistry;
+static int32_t g_nextSolverHandleId = 1;
+
+static inline int32_t registerSolver(std::unique_ptr<SparseSolverInstance> solver) {
+  int32_t id = g_nextSolverHandleId++;
+  if (id <= 0) {
+    id = 1;
+    g_nextSolverHandleId = 2;
+  }
+  while (g_sparseSolverRegistry.find(id) != g_sparseSolverRegistry.end()) {
+    id = g_nextSolverHandleId++;
+    if (id <= 0) {
+      id = 1;
+      g_nextSolverHandleId = 2;
+    }
+  }
+  g_sparseSolverRegistry[id] = std::move(solver);
+  return id;
+}
+
+static inline SparseSolverInstance* getSolver(int32_t handle) {
+  if (handle <= 0) return nullptr;
+  auto it = g_sparseSolverRegistry.find(handle);
+  if (it == g_sparseSolverRegistry.end()) return nullptr;
+  return it->second.get();
+}
+
+static inline bool unregisterSolver(int32_t handle) {
+  if (handle <= 0) return false;
+  auto it = g_sparseSolverRegistry.find(handle);
+  if (it == g_sparseSolverRegistry.end()) return false;
+  g_sparseSolverRegistry.erase(it);
+  return true;
+}
+
+template <typename MatrixType>
+static inline int factorizeAndRegister(
+    int n, const MatrixType& mat, int solverType, int32_t* outHandle
+) {
+  std::unique_ptr<SparseSolverInstance> instance;
+  if (solverType == SolverSimplicialLDLT) {
+    auto ldltInst = std::make_unique<SimplicialLDLTSolverInstance>(n, mat);
+    if (!ldltInst->isOk()) {
+      return Eigen::NumericalIssue;
+    }
+    instance = std::move(ldltInst);
+  } else {
+    auto lltInst = std::make_unique<SimplicialLLTSolverInstance>(n, mat);
+    if (!lltInst->isOk()) {
+      return Eigen::NumericalIssue;
+    }
+    instance = std::move(lltInst);
+  }
+  *outHandle = registerSolver(std::move(instance));
+  return Eigen::Success;
 }
 
 extern "C" {
@@ -495,6 +594,373 @@ int sparseTranspose(
   }
 
   return Eigen::Success;
+}
+
+// Sparse Cholesky Factorization: SimplicialLDLT (solverType: 0) or SimplicialLLT (solverType: 1)
+// Preconditions:
+//   A is a square n x n symmetric matrix in CSC or CSR format with valid ascending structure.
+//   solverType is 0 (SimplicialLDLT) or 1 (SimplicialLLT).
+// Returns:
+//   Success (0) and writes allocated positive handle ID to outHandle.
+//   NumericalIssue (1) if matrix is non-positive-definite (LLT) or has zero pivot, leaving outHandle untouched.
+//   InvalidInput (3) on null pointers, bounds violation, non-finite values or malformed structure, leaving outHandle untouched.
+EMSCRIPTEN_KEEPALIVE
+int sparseCholeskyFactorize(
+    const double* values,
+    const int32_t* innerIndices,
+    const int32_t* outerStarts,
+    int32_t n,
+    int32_t nnz,
+    int32_t storageOrder,
+    int32_t solverType,
+    int32_t* outHandle
+) {
+  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr || outHandle == nullptr) {
+    return Eigen::InvalidInput;
+  }
+  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
+    return Eigen::InvalidInput;
+  }
+  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+    return Eigen::InvalidInput;
+  }
+  if (solverType != SolverSimplicialLDLT && solverType != SolverSimplicialLLT) {
+    return Eigen::InvalidInput;
+  }
+  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
+    return Eigen::InvalidInput;
+  }
+  if (!allFinite(values, nnz)) {
+    return Eigen::InvalidInput;
+  }
+
+  try {
+    if (storageOrder == StorageOrderCSC) {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::ColMajor, int>> mat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      return factorizeAndRegister(n, mat, solverType, outHandle);
+    } else {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, int>> csrMat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      Eigen::SparseMatrix<double, Eigen::ColMajor, int> mat = csrMat;
+      mat.makeCompressed();
+      return factorizeAndRegister(n, mat, solverType, outHandle);
+    }
+  } catch (const std::bad_alloc&) {
+    return Eigen::InvalidInput;
+  } catch (...) {
+    return Eigen::NumericalIssue;
+  }
+}
+
+// Destroy a previously allocated sparse solver instance by handle ID.
+// Returns:
+//   Success (0) if handle was valid and deallocated.
+//   InvalidInput (3) if handle is non-positive or does not exist in registry.
+EMSCRIPTEN_KEEPALIVE
+int sparseCholeskyDestroy(int32_t handle) {
+  if (handle <= 0 || !unregisterSolver(handle)) {
+    return Eigen::InvalidInput;
+  }
+  return Eigen::Success;
+}
+
+// Direct Sparse Cholesky Solve: solves A * X = B via a pre-factorized handle.
+// Preconditions:
+//   handle references an active factorized direct solver instance.
+//   b points to n * nrhs finite doubles in row-major layout.
+//   nrhs >= 1.
+//   outX points to n * nrhs doubles.
+// Returns:
+//   Success (0) and writes solution to outX in row-major layout.
+//   NumericalIssue (1) if forward/back substitution encounters singularity, leaving outX untouched.
+//   InvalidInput (3) on null pointers, invalid handle, nrhs < 1, or non-finite values, leaving outX untouched.
+EMSCRIPTEN_KEEPALIVE
+int sparseCholeskySolve(
+    int32_t handle,
+    const double* b,
+    int32_t nrhs,
+    double* outX
+) {
+  if (handle <= 0 || b == nullptr || outX == nullptr || nrhs < 1) {
+    return Eigen::InvalidInput;
+  }
+  SparseSolverInstance* solver = getSolver(handle);
+  if (solver == nullptr) {
+    return Eigen::InvalidInput;
+  }
+  int32_t n = solver->dimension();
+  double totalElements = static_cast<double>(n) * static_cast<double>(nrhs);
+  if (totalElements > 20000000.0) {
+    return Eigen::InvalidInput;
+  }
+  int32_t total = n * nrhs;
+  if (!allFinite(b, total)) {
+    return Eigen::InvalidInput;
+  }
+
+  try {
+    return solver->solve(b, nrhs, outX);
+  } catch (const std::bad_alloc&) {
+    return Eigen::InvalidInput;
+  } catch (...) {
+    return Eigen::NumericalIssue;
+  }
+}
+
+// Iterative Sparse Solver: Conjugate Gradient (CG) with diagonal Jacobi preconditioning.
+// Solves A * X = B for symmetric positive-definite system.
+// Preconditions:
+//   A is a square n x n SPD matrix in CSC or CSR format with strictly ascending inner indices.
+//   b points to n * nrhs finite doubles in row-major layout.
+//   nrhs >= 1.
+//   outX points to n * nrhs doubles.
+//   maxIterations <= 0 defaults to 2 * n.
+//   tolerance <= 0.0 defaults to machine epsilon.
+//   outIterations and outEstimatedError are optional diagnostic output pointers (can be null).
+// Returns:
+//   Success (0): Converged within tolerance; writes outX and diagnostics.
+//   NoConvergence (2): Iteration budget exhausted; writes best-effort outX and diagnostics.
+//   NumericalIssue (1): Division by zero or breakdown (non-finite values), leaving outX and diagnostics untouched.
+//   InvalidInput (3): Null pointers, invalid bounds, non-finite inputs, leaving outX and diagnostics untouched.
+EMSCRIPTEN_KEEPALIVE
+int sparseConjugateGradient(
+    const double* values,
+    const int32_t* innerIndices,
+    const int32_t* outerStarts,
+    int32_t n,
+    int32_t nnz,
+    int32_t storageOrder,
+    const double* b,
+    int32_t nrhs,
+    double* outX,
+    int32_t maxIterations,
+    double tolerance,
+    int32_t* outIterations,
+    double* outEstimatedError
+) {
+  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr ||
+      b == nullptr || outX == nullptr) {
+    return Eigen::InvalidInput;
+  }
+  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
+    return Eigen::InvalidInput;
+  }
+  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+    return Eigen::InvalidInput;
+  }
+  if (nrhs < 1) {
+    return Eigen::InvalidInput;
+  }
+  double totalElements = static_cast<double>(n) * static_cast<double>(nrhs);
+  if (totalElements > 20000000.0) {
+    return Eigen::InvalidInput;
+  }
+  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
+    return Eigen::InvalidInput;
+  }
+  if (!allFinite(values, nnz) || !allFinite(b, n * nrhs) || !std::isfinite(tolerance)) {
+    return Eigen::InvalidInput;
+  }
+
+  try {
+    int maxIters = (maxIterations <= 0) ? (2 * n) : maxIterations;
+    double tol = (tolerance <= 0.0) ? Eigen::NumTraits<double>::epsilon() : tolerance;
+
+    Eigen::ConjugateGradient<Eigen::SparseMatrix<double, Eigen::ColMajor, int>,
+                             Eigen::Lower | Eigen::Upper,
+                             Eigen::DiagonalPreconditioner<double>> solver;
+    solver.setMaxIterations(maxIters);
+    solver.setTolerance(tol);
+
+    Eigen::SparseMatrix<double, Eigen::ColMajor, int> cscStorage;
+    if (storageOrder == StorageOrderCSC) {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::ColMajor, int>> mat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      solver.compute(mat);
+    } else {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, int>> csrMat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      cscStorage = csrMat;
+      cscStorage.makeCompressed();
+      solver.compute(cscStorage);
+    }
+
+    if (solver.info() != Eigen::Success) {
+      return Eigen::NumericalIssue;
+    }
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> B(b, n, nrhs);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> X(n, nrhs);
+
+    int totalIterations = 0;
+    double maxError = 0.0;
+    Eigen::ComputationInfo finalInfo = Eigen::Success;
+
+    for (int col = 0; col < nrhs; ++col) {
+      Eigen::VectorXd bCol = B.col(col);
+      Eigen::VectorXd xCol = solver.solve(bCol);
+
+      if (!xCol.allFinite()) {
+        return Eigen::NumericalIssue;
+      }
+
+      if (solver.info() == Eigen::NoConvergence) {
+        finalInfo = Eigen::NoConvergence;
+      } else if (solver.info() != Eigen::Success) {
+        return Eigen::NumericalIssue;
+      }
+
+      totalIterations = std::max(totalIterations, static_cast<int>(solver.iterations()));
+      maxError = std::max(maxError, solver.error());
+      X.col(col) = xCol;
+    }
+
+    std::copy(X.data(), X.data() + (n * nrhs), outX);
+    if (outIterations != nullptr) {
+      *outIterations = totalIterations;
+    }
+    if (outEstimatedError != nullptr) {
+      *outEstimatedError = maxError;
+    }
+
+    if (finalInfo == Eigen::NoConvergence) {
+      return Eigen::NoConvergence;
+    }
+    return Eigen::Success;
+
+  } catch (const std::bad_alloc&) {
+    return Eigen::InvalidInput;
+  } catch (...) {
+    return Eigen::NumericalIssue;
+  }
+}
+
+// Iterative Sparse Solver: BiCGSTAB with diagonal Jacobi preconditioning.
+// Solves A * X = B for general square non-symmetric and indefinite systems.
+// Preconditions:
+//   A is a square n x n matrix in CSC or CSR format with strictly ascending inner indices.
+//   b points to n * nrhs finite doubles in row-major layout.
+//   nrhs >= 1.
+//   outX points to n * nrhs doubles.
+//   maxIterations <= 0 defaults to 2 * n.
+//   tolerance <= 0.0 defaults to machine epsilon.
+//   outIterations and outEstimatedError are optional diagnostic output pointers (can be null).
+// Returns:
+//   Success (0): Converged within tolerance; writes outX and diagnostics.
+//   NoConvergence (2): Iteration budget exhausted; writes best-effort outX and diagnostics.
+//   NumericalIssue (1): Division by zero or breakdown (non-finite values), leaving outX and diagnostics untouched.
+//   InvalidInput (3): Null pointers, invalid bounds, non-finite inputs, leaving outX and diagnostics untouched.
+EMSCRIPTEN_KEEPALIVE
+int sparseBiCGSTAB(
+    const double* values,
+    const int32_t* innerIndices,
+    const int32_t* outerStarts,
+    int32_t n,
+    int32_t nnz,
+    int32_t storageOrder,
+    const double* b,
+    int32_t nrhs,
+    double* outX,
+    int32_t maxIterations,
+    double tolerance,
+    int32_t* outIterations,
+    double* outEstimatedError
+) {
+  if (values == nullptr || innerIndices == nullptr || outerStarts == nullptr ||
+      b == nullptr || outX == nullptr) {
+    return Eigen::InvalidInput;
+  }
+  if (!validSparseDim(n, n) || !validSparseNnz(nnz, n, n)) {
+    return Eigen::InvalidInput;
+  }
+  if (storageOrder != StorageOrderCSC && storageOrder != StorageOrderCSR) {
+    return Eigen::InvalidInput;
+  }
+  if (nrhs < 1) {
+    return Eigen::InvalidInput;
+  }
+  double totalElements = static_cast<double>(n) * static_cast<double>(nrhs);
+  if (totalElements > 20000000.0) {
+    return Eigen::InvalidInput;
+  }
+  if (!validCompressedStructure(outerStarts, innerIndices, n, n, nnz)) {
+    return Eigen::InvalidInput;
+  }
+  if (!allFinite(values, nnz) || !allFinite(b, n * nrhs) || !std::isfinite(tolerance)) {
+    return Eigen::InvalidInput;
+  }
+
+  try {
+    int maxIters = (maxIterations <= 0) ? (2 * n) : maxIterations;
+    double tol = (tolerance <= 0.0) ? Eigen::NumTraits<double>::epsilon() : tolerance;
+
+    Eigen::BiCGSTAB<Eigen::SparseMatrix<double, Eigen::ColMajor, int>,
+                    Eigen::DiagonalPreconditioner<double>> solver;
+    solver.setMaxIterations(maxIters);
+    solver.setTolerance(tol);
+
+    Eigen::SparseMatrix<double, Eigen::ColMajor, int> cscStorage;
+    if (storageOrder == StorageOrderCSC) {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::ColMajor, int>> mat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      solver.compute(mat);
+    } else {
+      Eigen::Map<const Eigen::SparseMatrix<double, Eigen::RowMajor, int>> csrMat(
+          n, n, nnz, outerStarts, innerIndices, values);
+      cscStorage = csrMat;
+      cscStorage.makeCompressed();
+      solver.compute(cscStorage);
+    }
+
+    if (solver.info() != Eigen::Success) {
+      return Eigen::NumericalIssue;
+    }
+
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>> B(b, n, nrhs);
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> X(n, nrhs);
+
+    int totalIterations = 0;
+    double maxError = 0.0;
+    Eigen::ComputationInfo finalInfo = Eigen::Success;
+
+    for (int col = 0; col < nrhs; ++col) {
+      Eigen::VectorXd bCol = B.col(col);
+      Eigen::VectorXd xCol = solver.solve(bCol);
+
+      if (!xCol.allFinite()) {
+        return Eigen::NumericalIssue;
+      }
+
+      if (solver.info() == Eigen::NoConvergence) {
+        finalInfo = Eigen::NoConvergence;
+      } else if (solver.info() != Eigen::Success) {
+        return Eigen::NumericalIssue;
+      }
+
+      totalIterations = std::max(totalIterations, static_cast<int>(solver.iterations()));
+      maxError = std::max(maxError, solver.error());
+      X.col(col) = xCol;
+    }
+
+    std::copy(X.data(), X.data() + (n * nrhs), outX);
+    if (outIterations != nullptr) {
+      *outIterations = totalIterations;
+    }
+    if (outEstimatedError != nullptr) {
+      *outEstimatedError = maxError;
+    }
+
+    if (finalInfo == Eigen::NoConvergence) {
+      return Eigen::NoConvergence;
+    }
+    return Eigen::Success;
+
+  } catch (const std::bad_alloc&) {
+    return Eigen::InvalidInput;
+  } catch (...) {
+    return Eigen::NumericalIssue;
+  }
 }
 
 } // extern "C"

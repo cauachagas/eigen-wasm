@@ -138,3 +138,20 @@ and sparse-sparse product (`C = A * B`).
 **Two-pass sparse allocation**: Pattern where a query function first computes the exact non-zero count
 (`outNnz`) of a variable-sized sparse result, enabling the caller to allocate buffers of exact size via
 `Module._malloc` before executing the computation.
+
+**SimplicialLDLT**: Direct sparse Cholesky solver computing `A = L * D * L^T` with Approximate Minimum Degree (AMD)
+ordering, supporting symmetric positive-definite and quasi-definite sparse systems without requiring square roots of
+diagonal elements.
+
+**SimplicialLLT**: Direct sparse Cholesky solver computing `A = L * L^T` with AMD ordering, strictly requiring
+symmetric positive-definite sparse matrices.
+
+**Opaque Handle**: A safe positive integer identifier (`int32_t`) managed by an internal C++ instance registry in
+WebAssembly memory, encapsulating a factorized direct solver instance across separate calls without exposing raw
+internal pointers.
+
+**ConjugateGradient**: Iterative Krylov subspace solver computing solutions to large symmetric positive-definite
+sparse systems `A * x = b` using diagonal (Jacobi) preconditioning, configurable with maximum iterations and tolerance.
+
+**BiCGSTAB**: Biconjugate gradient stabilized iterative solver computing solutions to general square non-symmetric
+sparse systems `A * x = b` using diagonal (Jacobi) preconditioning, configurable with maximum iterations and tolerance.

@@ -43,7 +43,7 @@ to touch no libstdc++ symbol, but any Eigen decomposition needs
 
 ## Test
 
-Run all 18 test suites:
+Run all 29 test suites:
 
 ```bash
 npm test
@@ -75,6 +75,11 @@ node test/test_sparse_spmm.js
 node test/test_sparse_add.js
 node test/test_sparse_ops.js
 node test/test_sparse_validation.js
+node test/test_sparse_cholesky_lifecycle.js
+node test/test_sparse_cholesky_solve.js
+node test/test_sparse_cg.js
+node test/test_sparse_bicgstab.js
+node test/test_sparse_solvers_integration.js
 ```
 
 
@@ -94,7 +99,7 @@ than left as a comment.
 
 ## API
 
-The module exports 31 C routines declared with `EMSCRIPTEN_KEEPALIVE` and `extern "C"`:
+The module exports 44 C routines declared with `EMSCRIPTEN_KEEPALIVE` and `extern "C"`:
 
 ```c
 // System & Configuration
@@ -148,6 +153,15 @@ int  sparseAddGetNnz(int rows, int cols, int nnzA, const double* aValues, const 
 int  sparseAdd(int rows, int cols, int nnzA, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int nnzB, const double* bValues, const int* bInnerIndices, const int* bOuterStarts, int storageOrder, double* outValues, int* outInnerIndices, int* outOuterStarts);
 int  sparseScale(int rows, int cols, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, double alpha, double* outValues, int* outInnerIndices, int* outOuterStarts);
 int  sparseTranspose(int rows, int cols, int nnz, const double* aValues, const int* aInnerIndices, const int* aOuterStarts, int storageOrder, double* outValues, int* outInnerIndices, int* outOuterStarts);
+
+// Direct Sparse Solvers (Simplicial Cholesky via Opaque Handles)
+int  sparseCholeskyFactorize(const double* values, const int* innerIndices, const int* outerStarts, int n, int nnz, int storageOrder, int solverType, int* outHandle);
+int  sparseCholeskySolve(int handle, const double* b, int nrhs, double* outX);
+int  sparseCholeskyDestroy(int handle);
+
+// Iterative Sparse Solvers
+int  sparseConjugateGradient(const double* values, const int* innerIndices, const int* outerStarts, int n, int nnz, int storageOrder, const double* b, int nrhs, double* outX, int maxIterations, double tolerance, int* outIterations, double* outEstimatedError);
+int  sparseBiCGSTAB(const double* values, const int* innerIndices, const int* outerStarts, int n, int nnz, int storageOrder, const double* b, int nrhs, double* outX, int maxIterations, double tolerance, int* outIterations, double* outEstimatedError);
 ```
 
 ### Common Conventions and Contracts
@@ -223,11 +237,21 @@ int  sparseTranspose(int rows, int cols, int nnz, const double* aValues, const i
 - `sparseScale(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, alpha, outValues, outInnerIndices, outOuterStarts)`: Sparse scalar multiplication `B = alpha * A`. Preserves sparsity pattern. Safely supports in-place aliasing (`outValues == aValues`). Returns `Success` or `InvalidInput`.
 - `sparseTranspose(rows, cols, nnz, aValues, aInnerIndices, aOuterStarts, storageOrder, outValues, outInnerIndices, outOuterStarts)`: Sparse matrix transposition `B = A^T`. Resulting dimensions are `cols x rows` with identical `nnz`. Returns `Success` or `InvalidInput`.
 
-### Dimension ceiling: 2048
+#### Direct Sparse Solvers (Simplicial Cholesky via Opaque Handles)
 
-The WebAssembly module enforces a canonical dimension ceiling of 2048 (`kMaxDimension = 2048`),
-supported by `-s STACK_SIZE=16MB`, `-s INITIAL_MEMORY=128MB`, and `-s MAXIMUM_MEMORY=4GB` with dynamic
-growth.
+- `sparseCholeskyFactorize(values, innerIndices, outerStarts, n, nnz, storageOrder, solverType, outHandle)`: Factorizes symmetric positive-definite sparse matrix `A` (storageOrder: 0 for CSC, 1 for CSR) using `SimplicialLDLT` (`solverType = 0`) or `SimplicialLLT` (`solverType = 1`). Allocates an opaque solver instance and writes its positive integer handle to `outHandle` (1 int). Returns `Success` (0), `NumericalIssue` (1 if non-positive-definite or zero pivot), or `InvalidInput` (3).
+- `sparseCholeskySolve(handle, b, nrhs, outX)`: Solves linear system `A * X = B` using a cached factorization handle. `b` points to `n * nrhs` doubles in row-major layout (`nrhs >= 1`). Solution is written to `outX` in row-major layout (`n * nrhs` doubles). Returns `Success` (0), `NumericalIssue` (1 if singular), or `InvalidInput` (3 on invalid/destroyed handle, null pointers, or non-finite inputs).
+- `sparseCholeskyDestroy(handle)`: Frees the solver instance associated with `handle` from the registry and deallocates its factorization. Returns `Success` (0) or `InvalidInput` (3 on non-existent or previously destroyed handle).
+
+#### Iterative Sparse Solvers
+
+- `sparseConjugateGradient(values, innerIndices, outerStarts, n, nnz, storageOrder, b, nrhs, outX, maxIterations, tolerance, outIterations, outEstimatedError)`: Stateless iterative Krylov solver for symmetric positive-definite systems using diagonal Jacobi preconditioning. `maxIterations <= 0` defaults to `2 * n`; `tolerance <= 0.0` defaults to machine epsilon. Supports single and multiple right-hand sides (`nrhs >= 1` in row-major layout). Optional diagnostic pointers `outIterations` and `outEstimatedError` can be null. Returns `Success` (0), `NoConvergence` (2 if budget exhausted, writing best-effort solution and diagnostics), `NumericalIssue` (1 on division by zero or breakdown), or `InvalidInput` (3).
+- `sparseBiCGSTAB(values, innerIndices, outerStarts, n, nnz, storageOrder, b, nrhs, outX, maxIterations, tolerance, outIterations, outEstimatedError)`: Stateless Biconjugate Gradient Stabilized solver with diagonal Jacobi preconditioning for general square, non-symmetric, or indefinite systems. Parameter conventions and diagnostics identical to `sparseConjugateGradient`. Returns `Success` (0), `NoConvergence` (2), `NumericalIssue` (1), or `InvalidInput` (3).
+
+### Dimension Ceilings
+
+- **Dense Operations**: Enforces a canonical dimension ceiling of 2048 (`kMaxDimension = 2048`), supported by `-s STACK_SIZE=16MB`, `-s INITIAL_MEMORY=128MB`, and `-s MAXIMUM_MEMORY=4GB` with dynamic growth. Dimensions exceeding 2048 return `InvalidInput` (3).
+- **Sparse Operations**: Enforces a sparse dimension ceiling of 1,000,000 rows/columns (`kMaxSparseDimension = 1000000`) and up to 10,000,000 non-zeros (`kMaxSparseNnz = 10000000`), allowing memory-efficient large-scale graph and differential equation modeling. Single/multiple right-hand side vectors are guarded against overflow (`n * nrhs <= 20000000`). Exceeding limits returns `InvalidInput` (3) before any memory allocation, leaving output buffers untouched.
 
 At dimension 2048, a matrix of double-precision numbers occupies 32 MB, and routines compute stably
 and deterministically without memory traps. Dimensions exceeding 2048 return `InvalidInput` (3) before
@@ -308,6 +332,17 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | `test_colpiv_qr.js` | Rank detection, column permutation, and deterministic matrix generation tests over `colPivQr` and `generatePrescribedSingularValues` |
 | `test_bdc_svd.js` | BDCSVD large matrix decomposition and non-finite input tests over `bdcSvd` |
 | `test_general_eigen.js` | General eigensolver, complex conjugate pairs, and convergence tests over `generalEigen` |
+| `test_sparse_triplets.js` | Coordinate triplets assembly and duplicate summation tests over `sparseFromTriplets` |
+| `test_sparse_spmv.js` | Sparse matrix-vector product tests over `sparseMatMulVec` |
+| `test_sparse_spmm.js` | Sparse-dense matrix multiplication tests over `sparseMatMulDense` |
+| `test_sparse_add.js` | Two-pass sparse matrix addition tests over `sparseAddGetNnz` and `sparseAdd` |
+| `test_sparse_ops.js` | Sparse scaling and transposition tests over `sparseScale` and `sparseTranspose` |
+| `test_sparse_validation.js` | Sparse dimension ceilings and bounds validation tests |
+| `test_sparse_cholesky_lifecycle.js` | Opaque handle lifecycle and Cholesky factorization tests over `sparseCholeskyFactorize` and `sparseCholeskyDestroy` |
+| `test_sparse_cholesky_solve.js` | Direct Cholesky solve and handle reuse tests over `sparseCholeskySolve` |
+| `test_sparse_cg.js` | Iterative Conjugate Gradient solver and convergence tests over `sparseConjugateGradient` |
+| `test_sparse_bicgstab.js` | Iterative BiCGSTAB solver for non-symmetric systems over `sparseBiCGSTAB` |
+| `test_sparse_solvers_integration.js` | End-to-end integration, capacity limits, and untouched buffer invariant tests for sparse solvers |
 
 For the complete ABI specifications, error contracts, and dimension ceilings, see `.scratch/eigen-wasm/ABI_CONTRACT.md`.
 
