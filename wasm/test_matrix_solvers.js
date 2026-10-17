@@ -193,12 +193,22 @@ testSolveLeastSquaresMatrix('solveLeastSquaresMatrix 3x2 with 2 RHS', A_ls, B_ls
   report('solveLUMatrix rejects nrhs > MAX_DIMENSION', solveLUMatrix(aPtr, bPtr, 2, MAX_DIMENSION + 1, outPtr), INVALID_INPUT);
 
   report('solveLeastSquaresMatrix rejects null a', solveLeastSquaresMatrix(0, bPtr, 2, 2, 2, outPtr), INVALID_INPUT);
+  report('solveLeastSquaresMatrix rejects null b', solveLeastSquaresMatrix(aPtr, 0, 2, 2, 2, outPtr), INVALID_INPUT);
+  report('solveLeastSquaresMatrix rejects null out', solveLeastSquaresMatrix(aPtr, bPtr, 2, 2, 2, 0), INVALID_INPUT);
   report('solveLeastSquaresMatrix rejects rows <= 0', solveLeastSquaresMatrix(aPtr, bPtr, 0, 2, 2, outPtr), INVALID_INPUT);
   report('solveLeastSquaresMatrix rejects cols <= 0', solveLeastSquaresMatrix(aPtr, bPtr, 2, 0, 2, outPtr), INVALID_INPUT);
   report('solveLeastSquaresMatrix rejects nrhs <= 0', solveLeastSquaresMatrix(aPtr, bPtr, 2, 2, 0, outPtr), INVALID_INPUT);
+  report('solveLeastSquaresMatrix rejects rows > MAX_DIMENSION', solveLeastSquaresMatrix(aPtr, bPtr, MAX_DIMENSION + 1, 2, 2, outPtr), INVALID_INPUT);
+  report('solveLeastSquaresMatrix rejects cols > MAX_DIMENSION', solveLeastSquaresMatrix(aPtr, bPtr, 2, MAX_DIMENSION + 1, 2, outPtr), INVALID_INPUT);
+  report('solveLeastSquaresMatrix rejects nrhs > MAX_DIMENSION', solveLeastSquaresMatrix(aPtr, bPtr, 2, 2, MAX_DIMENSION + 1, outPtr), INVALID_INPUT);
 
   const outSentinel = readDoubles(outPtr, 4);
   report('solveLUMatrix preserves output buffer on invalid input', outSentinel, new Array(4).fill(SENTINEL));
+
+  let lsOutPtr = alloc(new Array(4).fill(SENTINEL));
+  solveLeastSquaresMatrix(0, bPtr, 2, 2, 2, lsOutPtr);
+  report('solveLeastSquaresMatrix preserves output buffer on invalid input', readDoubles(lsOutPtr, 4), new Array(4).fill(SENTINEL));
+  Module._free(lsOutPtr);
 
   Module._free(aPtr);
   Module._free(bPtr);

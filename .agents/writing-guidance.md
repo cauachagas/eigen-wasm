@@ -39,4 +39,5 @@ misreads guidance when a sentence buries an instruction or a condition, not when
 - Treat a sentence of more than about 25 words as a signal, not a limit. It usually holds two instructions or an inline
   list; split it, or move the list into bullets.
 - `AGENTS.md` is loaded for every task, so keep it to what every task needs. Put the rest in the topic guide for the
-  tasks that need it.
+  tasks that need it. In this fork, project-wide policies, WebAssembly testing requirements, and fork-specific
+  invariants are intentionally maintained in `AGENTS.md` and take precedence over upstream guidance.

@@ -241,6 +241,39 @@ testCOD('cod 3x3 rank-1', A_rank1, 3, 3);
   Module._free(outPtr);
 }
 
+{
+  let aPtr = alloc([1, 2, 3, 4]);
+  let qPtr = alloc(new Array(4).fill(SENTINEL));
+  let tPtr = alloc(new Array(4).fill(SENTINEL));
+  let zPtr = alloc(new Array(4).fill(SENTINEL));
+  let permPtr = allocInts(new Array(2).fill(-999));
+  let rankPtr = allocInts([-999]);
+
+  report('cod rejects null a', cod(0, 2, 2, qPtr, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects null q_out', cod(aPtr, 2, 2, 0, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects null t_out', cod(aPtr, 2, 2, qPtr, 0, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects null z_out', cod(aPtr, 2, 2, qPtr, tPtr, 0, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects null perm_out', cod(aPtr, 2, 2, qPtr, tPtr, zPtr, 0, rankPtr), INVALID_INPUT);
+  report('cod rejects null rank_out', cod(aPtr, 2, 2, qPtr, tPtr, zPtr, permPtr, 0), INVALID_INPUT);
+  report('cod rejects rows <= 0', cod(aPtr, 0, 2, qPtr, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects cols <= 0', cod(aPtr, 2, 0, qPtr, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects rows > MAX_DIMENSION', cod(aPtr, MAX_DIMENSION + 1, 2, qPtr, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+  report('cod rejects cols > MAX_DIMENSION', cod(aPtr, 2, MAX_DIMENSION + 1, qPtr, tPtr, zPtr, permPtr, rankPtr), INVALID_INPUT);
+
+  report('cod preserves q_out buffer on invalid input', readDoubles(qPtr, 4), new Array(4).fill(SENTINEL));
+  report('cod preserves t_out buffer on invalid input', readDoubles(tPtr, 4), new Array(4).fill(SENTINEL));
+  report('cod preserves z_out buffer on invalid input', readDoubles(zPtr, 4), new Array(4).fill(SENTINEL));
+  report('cod preserves perm_out buffer on invalid input', readInts(permPtr, 2), new Array(2).fill(-999));
+  report('cod preserves rank_out buffer on invalid input', readInts(rankPtr, 1), [-999]);
+
+  Module._free(aPtr);
+  Module._free(qPtr);
+  Module._free(tPtr);
+  Module._free(zPtr);
+  Module._free(permPtr);
+  Module._free(rankPtr);
+}
+
 if (failed > 0) {
   console.error(`\n${failed} test(s) failed.`);
   process.exit(1);

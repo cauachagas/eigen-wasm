@@ -252,14 +252,19 @@ not bounded by anything: a call per frame without `_free` ends in a killed tab.
 | File | Purpose |
 |---|---|
 | `build.sh` | `em++` invocation and output paths |
-| `eigen_wasm.cpp` | `matMul3x3`, `matMul`, `determinant`, `solveLU`, `inv`, `cholesky`, `qr`, `solveLeastSquares`, `svd`, `svdSingularValues`, `symmetricEigen`, `ldlt`, `bunchKaufman`, `colPivQr`, `rank`, `generatePrescribedSingularValues`, `bdcSvd`, `generalEigen`, `maxDimension` |
+| `eigen_wasm.cpp` | `matMul3x3`, `matMul`, `transpose`, `trace`, `matrixNorm`, `determinant`, `solveLU`, `solveLUMatrix`, `inv`, `solvePartialLU`, `invPartialLU`, `cholesky`, `solveCholesky`, `solveTriangularLower`, `solveTriangularUpper`, `qr`, `solveLeastSquares`, `solveLeastSquaresMatrix`, `ldlt`, `bunchKaufman`, `colPivQr`, `rank`, `cod`, `pseudoInverse`, `svd`, `svdSingularValues`, `bdcSvd`, `generatePrescribedSingularValues`, `symmetricEigen`, `generalEigen`, `maxDimension` |
 | `example.js` | Worked example; imported and run by the tests |
 | `test_helpers.js` | Shared test assertions, error constants, buffer helpers, and sentinels |
-| `test_matmul.js` | Table-driven tests over `matMul3x3` |
+| `test_matmul.js` | Table-driven tests over `matMul3x3` and `matMul` |
 | `test_determinant.js` | Value, contract and ceiling tests over `determinant` |
+| `test_matrix_ops.js` | Transpose, trace, and matrix norm tests over `transpose`, `trace`, `matrixNorm` |
 | `test_lu.js` | Residual, singularity, and contract tests over `solveLU` and `inv` |
+| `test_partial_lu.js` | Residual, singularity, and contract tests over `solvePartialLU` and `invPartialLU` |
 | `test_cholesky.js` | Residual, symmetry, and positive-definiteness tests over `cholesky` |
+| `test_dense_solvers.js` | Cholesky solve and triangular solver tests over `solveCholesky`, `solveTriangularLower`, `solveTriangularUpper` |
 | `test_qr.js` | Factorization, residual, least squares, and orthogonality tests over `qr` and `solveLeastSquares` |
+| `test_matrix_solvers.js` | Multiple RHS linear solver tests over `solveLUMatrix` and `solveLeastSquaresMatrix` |
+| `test_cod.js` | Complete Orthogonal Decomposition and pseudoinverse tests over `cod` and `pseudoInverse` |
 | `test_svd.js` | Singular value, reconstruction, and non-finite tests over `svd` |
 | `test_eigen.js` | Analytical, eigenvector residual, and symmetry tests over `symmetricEigen` |
 | `test_ldlt.js` | Positive semidefinite, residual, and symmetry tests over `ldlt` and `bunchKaufman` |
