@@ -8,9 +8,9 @@ Verificado pelos mesmos resíduos do Cholesky.
 
 **Blocked by:** 004
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `ldlt` fatora matriz simétrica semi-definida onde Cholesky devolve `NumericalIssue`
-- [ ] `bunchKaufman` fatora matriz simétrica indefinida
-- [ ] Resíduo da identidade de reconstrução exportado e abaixo do limiar relativo
-- [ ] Pivoting zero em `ldlt` devolve `NumericalIssue`
+- [x] `ldlt` fatora matriz simétrica semi-definida onde Cholesky devolve `NumericalIssue`
+- [x] `bunchKaufman` fatora matriz simétrica indefinida
+- [x] Resíduo da identidade de reconstrução exportado e abaixo do limiar relativo
+- [x] Pivoting zero em `ldlt` devolve `NumericalIssue`

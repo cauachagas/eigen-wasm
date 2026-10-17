@@ -12,11 +12,11 @@ Verificado com as matrizes de valor singular prescrito do upstream.
 
 **Blocked by:** 008
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Gerador de matriz com valores singulares prescritos produz a matriz esperada a partir de
+- [x] Gerador de matriz com valores singulares prescritos produz a matriz esperada a partir de
       uma semente explícita
-- [ ] `colPivQr` devolve `rank` e a permutação de colunas
-- [ ] Rank de uma matriz construída com valores singulares prescritos coincide com o rank
+- [x] `colPivQr` devolve `rank` e a permutação de colunas
+- [x] Rank de uma matriz construída com valores singulares prescritos coincide com o rank
       pretendido
-- [ ] Uma execução com a mesma semente produz a mesma matriz, verificado duas vezes
+- [x] Uma execução com a mesma semente produz a mesma matriz, verificado duas vezes
