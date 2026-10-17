@@ -8,10 +8,10 @@ todo o resto da spec vive em `Success` ou `NumericalIssue`.
 
 **Blocked by:** 012
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Autovalores e autovetores de matriz real não simétrica devolvidos em buffers do chamador
-- [ ] `NoConvergence` é alcançável e devolvido, com a mesma condição que a suíte upstream
+- [x] Autovalores e autovetores de matriz real não simétrica devolvidos em buffers do chamador
+- [x] `NoConvergence` é alcançável e devolvido, com a mesma condição que a suíte upstream
       afirma
-- [ ] Cada autovetor confere contra o autovalor correspondente, por resíduo
-- [ ] Complexos conjugados saem em pares
+- [x] Cada autovetor confere contra o autovalor correspondente, por resíduo
+- [x] Complexos conjugados saem em pares

@@ -9,9 +9,9 @@ fica ou sai.
 
 **Blocked by:** 010
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] `BDCSVD` usado acima de um limiar de dimensão, com o limiar documentado
-- [ ] Tamanho do wasm medido em instância dinâmica e no teto de dimensão, cru e gzip, por rotina
-- [ ] A tabela de tamanhos da spec atualizada com números medidos, não inferidos
-- [ ] Uma decisão registrada sobre manter ou remover `BDCSVD`, com o custo em KB
+- [x] `BDCSVD` usado acima de um limiar de dimensão, com o limiar documentado
+- [x] Tamanho do wasm medido em instância dinâmica e no teto de dimensão, cru e gzip, por rotina
+- [x] A tabela de tamanhos da spec atualizada com números medidos, não inferidos
+- [x] Uma decisão registrada sobre manter ou remover `BDCSVD`, com o custo em KB

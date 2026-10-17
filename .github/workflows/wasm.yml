@@ -59,3 +59,15 @@ jobs:
 
       - name: Test symmetric eigensolver
         run: node wasm/test_eigen.js
+
+      - name: Test LDLT
+        run: node wasm/test_ldlt.js
+
+      - name: Test column-pivoted QR and generator
+        run: node wasm/test_colpiv_qr.js
+
+      - name: Test BDCSVD
+        run: node wasm/test_bdc_svd.js
+
+      - name: Test general eigensolver
+        run: node wasm/test_general_eigen.js

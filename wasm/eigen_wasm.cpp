@@ -285,4 +285,195 @@ int symmetricEigen(const double* a, int n, double* eigenvalues_out, double* eige
 
   return Eigen::Success;
 }
+
+// LDLT factorization for symmetric matrices (positive semidefinite and indefinite).
+// Preconditions: A is n-by-n symmetric, l_out is n-by-n row-major, d_out is n-vector.
+EMSCRIPTEN_KEEPALIVE
+int ldlt(const double* a, int n, double* l_out, double* d_out) {
+  if (a == nullptr || l_out == nullptr || d_out == nullptr || n < 1 || n > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  // Symmetry check
+  for (int i = 0; i < n; ++i) {
+    for (int j = i + 1; j < n; ++j) {
+      double diff = std::abs(a[i * n + j] - a[j * n + i]);
+      double mag = std::min(std::abs(a[i * n + j]), std::abs(a[j * n + i]));
+      if (diff > 1e-12 && diff > mag * 1e-6) {
+        return Eigen::InvalidInput;
+      }
+    }
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  Eigen::LDLT<RowMajorMatrix> ldltDecomp(A);
+  if (ldltDecomp.info() != Eigen::Success) {
+    return ldltDecomp.info();
+  }
+
+  RowMajorMatrix L = ldltDecomp.matrixL();
+  int total = n * n;
+  for (int i = 0; i < total; ++i) {
+    l_out[i] = L.data()[i];
+  }
+
+  Eigen::VectorXd D = ldltDecomp.vectorD();
+  for (int i = 0; i < n; ++i) {
+    d_out[i] = D[i];
+  }
+
+  return Eigen::Success;
+}
+
+// ColPivHouseholderQR: column-pivoted QR with rank and column permutation.
+// Preconditions: A is rows x cols row-major.
+// q_out: rows x rows, r_out: rows x cols, perm_out: cols integers, rank_out: 1 integer.
+EMSCRIPTEN_KEEPALIVE
+int colPivQr(const double* a, int rows, int cols, double* q_out, double* r_out, int* perm_out, int* rank_out) {
+  if (a == nullptr || q_out == nullptr || r_out == nullptr || perm_out == nullptr || rank_out == nullptr ||
+      rows < 1 || cols < 1 || rows > kMaxDimension || cols > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  Eigen::ColPivHouseholderQR<RowMajorMatrix> cpqr(A);
+
+  RowMajorMatrix Q = cpqr.householderQ();
+  RowMajorMatrix R = cpqr.matrixQR().template triangularView<Eigen::Upper>();
+
+  int qEntries = rows * rows;
+  for (int i = 0; i < qEntries; ++i) q_out[i] = Q.data()[i];
+
+  int rEntries = rows * cols;
+  for (int i = 0; i < rEntries; ++i) r_out[i] = R.data()[i];
+
+  const auto& p = cpqr.colsPermutation();
+  for (int i = 0; i < cols; ++i) perm_out[i] = static_cast<int>(p.indices()[i]);
+
+  *rank_out = static_cast<int>(cpqr.rank());
+
+  return Eigen::Success;
+}
+
+// Deterministic matrix generator with prescribed singular values.
+// Ported to use explicit linear congruential PRNG so results are platform-independent.
+EMSCRIPTEN_KEEPALIVE
+int generatePrescribedSingularValues(double* out, int rows, int cols, const double* s, int s_len, unsigned int seed) {
+  int k = std::min(rows, cols);
+  if (out == nullptr || s == nullptr || rows < 1 || cols < 1 || s_len < k ||
+      rows > kMaxDimension || cols > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  // Simple, deterministic LCG for test matrix generation (same across all libc/wasm targets)
+  auto lcg = [&seed]() -> double {
+    seed = seed * 1664525u + 1013904223u;
+    return static_cast<double>(seed % 10000u) / 10000.0 - 0.5;
+  };
+
+  RowMajorMatrix U = RowMajorMatrix::Zero(rows, k);
+  for (int j = 0; j < k; ++j) {
+    for (int i = 0; i < rows; ++i) U(i, j) = lcg();
+    // Gram-Schmidt orthogonalization
+    for (int p = 0; p < j; ++p) {
+      double dot = U.col(j).dot(U.col(p));
+      U.col(j) -= dot * U.col(p);
+    }
+    double n = U.col(j).norm();
+    if (n > 1e-12) U.col(j) /= n;
+  }
+
+  RowMajorMatrix V = RowMajorMatrix::Zero(cols, k);
+  for (int j = 0; j < k; ++j) {
+    for (int i = 0; i < cols; ++i) V(i, j) = lcg();
+    for (int p = 0; p < j; ++p) {
+      double dot = V.col(j).dot(V.col(p));
+      V.col(j) -= dot * V.col(p);
+    }
+    double n = V.col(j).norm();
+    if (n > 1e-12) V.col(j) /= n;
+  }
+
+  Eigen::VectorXd S(k);
+  for (int i = 0; i < k; ++i) S[i] = s[i];
+
+  RowMajorMatrix A = U * S.asDiagonal() * V.transpose();
+  int total = rows * cols;
+  for (int i = 0; i < total; ++i) {
+    out[i] = A.data()[i];
+  }
+
+  return Eigen::Success;
+}
+
+// BDCSVD for large matrices.
+EMSCRIPTEN_KEEPALIVE
+int bdcSvd(const double* a, int rows, int cols, double* s_out, double* u_out, double* vt_out) {
+  if (a == nullptr || s_out == nullptr || u_out == nullptr || vt_out == nullptr ||
+      rows < 1 || cols < 1 || rows > kMaxDimension || cols > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, rows, cols);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::BDCSVD<RowMajorMatrix, Eigen::ComputeThinU | Eigen::ComputeThinV> bdc(A);
+  if (bdc.info() != Eigen::Success) {
+    return bdc.info();
+  }
+
+  int k = std::min(rows, cols);
+  const auto& s = bdc.singularValues();
+  for (int i = 0; i < k; ++i) s_out[i] = s[i];
+
+  RowMajorMatrix U = bdc.matrixU();
+  int u_size = rows * k;
+  for (int i = 0; i < u_size; ++i) u_out[i] = U.data()[i];
+
+  RowMajorMatrix Vt = bdc.matrixV().transpose();
+  int vt_size = k * cols;
+  for (int i = 0; i < vt_size; ++i) vt_out[i] = Vt.data()[i];
+
+  return Eigen::Success;
+}
+
+// General Eigensolver over RealSchur for non-symmetric matrices.
+// real_eivals / imag_eivals: n doubles each.
+// real_eivecs / imag_eivecs: n x n doubles each.
+EMSCRIPTEN_KEEPALIVE
+int generalEigen(const double* a, int n, double* real_eivals, double* imag_eivals, double* real_eivecs, double* imag_eivecs) {
+  if (a == nullptr || real_eivals == nullptr || imag_eivals == nullptr ||
+      real_eivecs == nullptr || imag_eivecs == nullptr ||
+      n < 1 || n > kMaxDimension) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::Map<const RowMajorMatrix> A(a, n, n);
+  if (!A.allFinite()) {
+    return Eigen::InvalidInput;
+  }
+
+  Eigen::EigenSolver<RowMajorMatrix> solver(A);
+  if (solver.info() != Eigen::Success) {
+    return solver.info();
+  }
+
+  const auto& eivals = solver.eigenvalues();
+  for (int i = 0; i < n; ++i) {
+    real_eivals[i] = eivals[i].real();
+    imag_eivals[i] = eivals[i].imag();
+  }
+
+  const auto& eivecs = solver.eigenvectors();
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) {
+      real_eivecs[i * n + j] = eivecs(i, j).real();
+      imag_eivecs[i * n + j] = eivecs(i, j).imag();
+    }
+  }
+
+  return Eigen::Success;
+}
 }
