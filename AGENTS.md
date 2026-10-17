@@ -82,7 +82,9 @@ The wording of a rule sets its strength:
    that fails without the fix when practical. With a performance-sensitive change, add an appropriate benchmark. Scale
    broader coverage to the affected scalar types, storage orders, backends, and public contracts. Confirm the new test
    fails at the parent commit when practical; otherwise show that the test runs the changed code by construction. See
-   [`.agents/testing.md`](.agents/testing.md).
+   [`.agents/testing.md`](.agents/testing.md). For WebAssembly tests under `wasm/`, always inspect and adapt numerical
+   cases, rank-deficient matrices, and verification assertions directly from the upstream Eigen C++ tests under
+   `test/` whenever possible.
 8. **Treat external writes as deliberate actions.** Push, open or update a merge request, comment on an issue, or write
    to any other external system only when the user has asked for that action. Otherwise, stop after the local commit and
    ask. Recommend the `affected-tests` label with the relevant platform labels, or with `all-platforms` for broader
