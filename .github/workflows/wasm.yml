@@ -29,7 +29,7 @@ on:
 
 jobs:
   build-and-test:
-    name: build and run matMul3x3 tests
+    name: build and run the wasm test suites
     runs-on: ubuntu-latest
     # The emsdk image ships emcc and Node already, so there is nothing to install.
     container: emscripten/emsdk:latest
@@ -39,5 +39,35 @@ jobs:
       - name: Build
         run: ./wasm/build.sh
 
-      - name: Test
+      - name: Test matMul3x3
         run: node wasm/test_matmul.js
+
+      - name: Test determinant
+        run: node wasm/test_determinant.js
+
+      - name: Test LU and inverse
+        run: node wasm/test_lu.js
+
+      - name: Test Cholesky
+        run: node wasm/test_cholesky.js
+
+      - name: Test QR and least squares
+        run: node wasm/test_qr.js
+
+      - name: Test SVD
+        run: node wasm/test_svd.js
+
+      - name: Test symmetric eigensolver
+        run: node wasm/test_eigen.js
+
+      - name: Test LDLT
+        run: node wasm/test_ldlt.js
+
+      - name: Test column-pivoted QR and generator
+        run: node wasm/test_colpiv_qr.js
+
+      - name: Test BDCSVD
+        run: node wasm/test_bdc_svd.js
+
+      - name: Test general eigensolver
+        run: node wasm/test_general_eigen.js

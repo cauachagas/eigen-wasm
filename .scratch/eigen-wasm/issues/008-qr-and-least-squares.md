@@ -9,10 +9,10 @@ primeira vez que o produto dinâmico é usado na verificação.
 
 **Blocked by:** 004
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Fatoração QR de matriz retangular devolvida num buffer do chamador
-- [ ] Solução de mínimos quadrados com resíduo `norma de A x menos b` e normal `norma de A
+- [x] Fatoração QR de matriz retangular devolvida num buffer do chamador
+- [x] Solução de mínimos quadrados com resíduo `norma de A x menos b` e normal `norma de A
       menos x` abaixo dos limiares
-- [ ] Matriz quadrada funciona e retangular também, com as dimensões documentadas
-- [ ] Produto dinâmico disponível para as verificações de resíduo
+- [x] Matriz quadrada funciona e retangular também, com as dimensões documentadas
+- [x] Produto dinâmico disponível para as verificações de resíduo

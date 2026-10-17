@@ -8,10 +8,10 @@ Este é o corte barato do SVD: quase nada de custo em relação ao SVD completo.
 
 **Blocked by:** 004
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Valores singulares e U e V devolvidos em buffers do chamador
-- [ ] Valores singulares conferem contra os valores prescritos dentro do limiar relativo
-- [ ] Matriz de posto deficiente, construida com valores singulares prescritos, produz posto `r`
-- [ ] Entrada não-finita devolve `InvalidInput`, que é o valor que o Eigen devolve
-- [ ] A ordem dos valores singulares é decrescente e está documentada
+- [x] Valores singulares e U e V devolvidos em buffers do chamador
+- [x] Valores singulares conferem contra os valores prescritos dentro do limiar relativo
+- [x] Matriz de posto deficiente, construida com valores singulares prescritos, produz posto `r`
+- [x] Entrada não-finita devolve `InvalidInput`, que é o valor que o Eigen devolve
+- [x] A ordem dos valores singulares é decrescente e está documentada
