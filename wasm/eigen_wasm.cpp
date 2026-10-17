@@ -16,6 +16,12 @@ using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eig
 
 extern "C" {
 
+// Expose the target dimension ceiling so tests and callers can read it rather than duplicating it.
+EMSCRIPTEN_KEEPALIVE
+int maxDimension() {
+  return kMaxDimension;
+}
+
 // Preconditions: a, b and out are non-null pointers to 9 doubles each, laid out
 // row-major (a[3*i + j] is row i, column j). out may alias a or b.
 // JS callers reach memory through Module.setValue/getValue.
