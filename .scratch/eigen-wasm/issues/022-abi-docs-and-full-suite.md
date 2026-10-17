@@ -4,11 +4,11 @@
 
 **Blocked by:** 017, 018, 019, 020, 021
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Atualizar `.scratch/eigen-wasm/ABI_CONTRACT.md` com tabelas de rotinas, assinaturas e invariantes
-- [ ] Atualizar `GLOSSARY.md` com novos termos de domínio
-- [ ] Atualizar `wasm/README.md` com lista de exports, exemplos e comandos de execução
-- [ ] Executar todas as suítes de testes (`for f in wasm/test_*.js; do node "$f"; done`) e assegurar 100% de passagem
-- [ ] Preparar diff limpo para o agente de revisão (`/code-review`)
+- [x] Atualizar `.scratch/eigen-wasm/ABI_CONTRACT.md` com tabelas de rotinas, assinaturas e invariantes
+- [x] Atualizar `GLOSSARY.md` com novos termos de domínio
+- [x] Atualizar `wasm/README.md` com lista de exports, exemplos e comandos de execução
+- [x] Executar todas as suítes de testes (`for f in wasm/test_*.js; do node "$f"; done`) e assegurar 100% de passagem
+- [x] Preparar diff limpo para 1 agente de revisão (`/code-review`) por cada Ticket (017-022)
 - [ ] Executar retrospectiva `/retro`
