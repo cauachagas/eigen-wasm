@@ -25,6 +25,7 @@ O `eigen-wasm` é um porte WebAssembly autônomo dos módulos Core e Dense da bi
   - [`docs/agents/issue-tracker.md`](docs/agents/issue-tracker.md)
   - [`docs/agents/triage-labels.md`](docs/agents/triage-labels.md)
   - [`docs/agents/domain.md`](docs/agents/domain.md) e [`GLOSSARY.md`](GLOSSARY.md)
+- **Versionamento de Especificações:** Ao finalizar uma feature ou épico, os arquivos `.scratch/<feature>/spec.md`, `.scratch/<feature>/retro.md` e os tickets `.scratch/<feature>/issues/*.md` **devem ser commitados no repositório**, garantindo auditabilidade e governança local contínua.
 
 ### 2. Padrão EARS para `/grill-me` e `/grill-with-docs`
 - Toda rodada de planejamento ou entrevista via `/grill-me` ou `/grill-with-docs` **DEVE** formular e registrar os requisitos da especificação (`spec.md` ou `spec-<feature>.md`) utilizando o padrão da skill `ears-requirements` (Easy Approach to Requirements Syntax).
@@ -71,6 +72,15 @@ O `eigen-wasm` é um porte WebAssembly autônomo dos módulos Core e Dense da bi
   - Uma instrução ou constatação técnica por sentença.
   - Vocabulário técnico preciso para que o agente implementador possa agir sem incertezas.
 
+### 3. Revisão Externa Automatizada via OpenCode CLI
+- Pode-se acionar o OpenCode CLI para atuar como revisor automatizado de tickets ou épicos:
+  ```bash
+  opencode run -m opencode/beam-free "faça review com a skill @code-review com auxílio da skill @asd-ste100 <detalhes do ticket/código>"
+  ```
+- **Identificador do Modelo:** O modelo `beam-free` deve sempre ser qualificado com o prefixo do provedor: `opencode/beam-free`.
+- **Limpeza de Artefatos Temporários:** Relatórios temporários de revisão externa (ex.: `.scratch/<feature>/review.md`, `review_claude.md`) servem apenas como apoio durante a iteração. Eles **devem ser excluídos antes do commit final**.
+- **Integridade de Links:** Antes de apagar relatórios temporários, garanta que nenhum arquivo permanente (`retro.md`, `spec.md`, documentação) possua links órfãos apontando para eles.
+
 ---
 
 ## Finalização de Especificação e Retrospectiva
@@ -91,3 +101,6 @@ O `eigen-wasm` é um porte WebAssembly autônomo dos módulos Core e Dense da bi
 3. **Privacidade e Portabilidade:** Nunca exponha o caminho absoluto do home do usuário; generalize caminhos com `~/` ou `$HOME/`. Use links relativos dentro do repositório.
 4. **Submódulo Eigen:** Trate `deps/eigen` como somente leitura. Não modifique arquivos internos do Eigen diretamente.
 5. **Licenciamento REUSE:** Todos os arquivos novos criados devem conter cabeçalho SPDX adequado (`// SPDX-FileCopyrightText: The Eigen Authors` e `// SPDX-License-Identifier: MPL-2.0`) ou estar mapeados em `REUSE.toml`.
+6. **Invariante do Buffer de Saída Intocado (Untouched Buffer Invariant):** Se uma função C++/Wasm falhar ou receber entradas inválidas (retornando status diferente de 0, ex.: `3` - `InvalidInput`), os buffers de saída do chamador **NUNCA** devem ser modificados. As suítes de teste devem validar esse invariante usando valores sentinela canônicos (`SENTINEL = -4.4444444444444e-100` em `test/test_helpers.js`).
+7. **Compressão Obrigatória em Matrizes Esparsas:** Em matrizes esparsas (`Eigen::SparseMatrix`), operações que retornam expressões (como transposição) devem chamar explicitamente `.makeCompressed()` antes da extração de ponteiros brutos (`outerIndexPtr`, `innerIndexPtr`, `valuePtr`), garantindo layout contíguo válido na memória.
+8. **Validação Estrutural de Índices Esparsos:** Toda entrada esparsa comprimida (CSC/CSR) deve ser validada contra monotonicidade estrita crescente nos índices internos de cada fatia para impedir corrupção de memória e loops fora de limites.
