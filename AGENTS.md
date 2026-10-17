@@ -88,15 +88,20 @@ The wording of a rule sets its strength:
    ask. Recommend the `affected-tests` label with the relevant platform labels, or with `all-platforms` for broader
    coverage; see [`.agents/ci.md`](.agents/ci.md). Do not add `all-tests` without the user's explicit permission for
    that label.
+9. **Mandatory Graphify for discovery and navigation.** As specified in [`RULES.md`](RULES.md), `graphify` is the sole
+   source of truth for repository structure, code navigation, and file discovery. Never use `grep`, `rg`, or `find` for
+   discovery. Use `graphify query`, `graphify-out/manifest.json`, `graphify-out/graph.json`, and
+   `graphify-out/GRAPH_REPORT.md`.
 
 ## Standard workflow
 
 1. Inspect `git status --short`, the current branch, and the diff. Separate pre-existing work from the requested change.
 2. As applicable, read the public header, implementation, nearby tests, registration in `CMakeLists.txt`, and relevant
-   task guides before deciding on an implementation. Search with `rg` or `rg --files` (add `--hidden` to search
-   `.agents/`), unless [`RULES.md`](RULES.md) directs discovery elsewhere. Before writing a helper, check `numext`,
-   `NumTraits`, `MathFunctions.h`, `Meta.h`, `XprHelper.h`, and the `test/*_helpers.h` headers for an existing one. If
-   one exists but lacks the hardening you need, fix it there rather than adding a local copy.
+   task guides before deciding on an implementation. For code discovery and navigation, use Graphify as mandated by
+   [`RULES.md`](RULES.md) (via `graphify query`, `graphify-out/manifest.json`, or `graphify-out/graph.json`); never use
+   `rg`, `grep`, or `find` for discovery. Before writing a helper, check `numext`, `NumTraits`, `MathFunctions.h`,
+   `Meta.h`, `XprHelper.h`, and the `test/*_helpers.h` headers for an existing one. If one exists but lacks the
+   hardening you need, fix it there rather than adding a local copy.
 3. Keep the patch within the owning module and established patterns. Avoid opportunistic refactors and churn in
    generated files or metadata.
 4. Add or update applicable tests and benchmarks in the same patch. Test public behavior through its umbrella header, so

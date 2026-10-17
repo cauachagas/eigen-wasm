@@ -45,10 +45,11 @@ em++ "$SRC" -o "$OUT" \
   -I"$ROOT" \
   -O3 \
   -s ALLOW_MEMORY_GROWTH=1 \
+  -s STACK_SIZE=4MB \
   -s EXPORT_ES6=1 \
   -s MODULARIZE=1 \
   -s EXPORT_NAME="EigenWasmModule" \
-  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_solveLU","_inv","_cholesky","_qr","_solveLeastSquares","_matMul","_svd","_symmetricEigen","_ldlt","_bunchKaufman","_colPivQr","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free"]' \
+  -s EXPORTED_FUNCTIONS='["_matMul3x3","_determinant","_solveLU","_inv","_cholesky","_qr","_solveLeastSquares","_matMul","_svd","_svdSingularValues","_symmetricEigen","_ldlt","_bunchKaufman","_colPivQr","_rank","_generatePrescribedSingularValues","_bdcSvd","_generalEigen","_maxDimension","_malloc","_free"]' \
   -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","setValue","getValue"]' \
   -std=c++17
 
