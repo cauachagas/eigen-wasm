@@ -1,4 +1,6 @@
-O code-review terminou agora. Resumo dos achados (ASD-STE100):
+# Code Review: Dense Routines (Tickets 004-013)
+
+Resumo dos achados no padrão ASD-STE100:
 
 5 findings confirmados em wasm/eigen_wasm.cpp:
 
@@ -13,4 +15,4 @@ O code-review terminou agora. Resumo dos achados (ASD-STE100):
 - linha 50 – isPartialPivLUInvertible rejeita matrizes com diagonais de magnitude muito pequena via ratio/rcond
   → matriz bem escalada mas mal condicionada pode ser rejeitada de forma conservadora demais.
 
-Arquivos afetados: /Users/cauachagas/Projects/wasm/eigen/wasm/eigen_wasm.cpp
+Arquivos afetados: wasm/eigen_wasm.cpp
