@@ -17,3 +17,7 @@ graphify-out/
 # agents
 skills-lock.json
 .agents/
+
+# ai-memory
+.ai-memory
+.ai-memory/
