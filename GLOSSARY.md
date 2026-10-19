@@ -155,3 +155,13 @@ sparse systems `A * x = b` using diagonal (Jacobi) preconditioning, configurable
 
 **BiCGSTAB**: Biconjugate gradient stabilized iterative solver computing solutions to general square non-symmetric
 sparse systems `A * x = b` using diagonal (Jacobi) preconditioning, configurable with maximum iterations and tolerance.
+
+## Knowledge and Agent Operations
+
+**Harness**: The runtime execution environment or CLI interface driving an LLM agent on a repository (e.g., `agy`, `opencode`, `kilo`).
+
+**Cross-Harness Memory**: An external, persistent knowledge layer (`ai-memory`) allowing different harnesses and LLMs to operate over the same project mental model, architecture decisions, and session state.
+
+**Knowledge Scope**: The `workspace:project` namespace tuple identifying a repository's memory domain in `ai-memory`, canonically configured as `default:libeigen-eigen` for this project.
+
+**Session Handoff**: Ephemeral, single-use structured baton (`memory_handoff_begin` / `memory_handoff_accept`) transferring workstream state, open questions, and next steps between agent sessions.
